@@ -15,7 +15,7 @@
 const bool query_hand_velocities = true;
 
 // use optional XrSpaceVelocity in xrLocateHandJointsEXT and visualize linear velocity
-const bool query_joint_velocities = true;
+const bool query_joint_velocities = false;
 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
@@ -360,6 +360,8 @@ struct gl_renderer_t
 	GLuint VAO;
 };
 
+struct hand_tracking_t;
+
 #ifdef __linux__
 bool
 init_sdl_window(Display** xDisplay,
@@ -381,6 +383,7 @@ render_frame(int w,
              XrTime predictedDisplayTime,
              int view_index,
              XrSpaceLocation* hand_locations,
+             struct hand_tracking_t* hand_tracking,
              XrMatrix4x4f projectionmatrix,
              XrMatrix4x4f viewmatrix,
              GLuint image,
@@ -445,6 +448,15 @@ print_system_properties(XrSystemProperties* system_properties)
 	       system_properties->graphicsProperties.maxSwapchainImageWidth);
 	printf("\tOrientation Tracking: %d\n", system_properties->trackingProperties.orientationTracking);
 	printf("\tPosition Tracking   : %d\n", system_properties->trackingProperties.positionTracking);
+
+	const XrBaseInStructure* next = system_properties->next;
+	while (next) {
+		if (next->type == XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT) {
+			XrSystemHandTrackingPropertiesEXT* ht = system_properties->next;
+			printf("\tHand Tracking       : %d\n", ht->supportsHandTracking);
+		}
+		next = next->next;
+	}
 }
 
 static void
@@ -591,14 +603,26 @@ get_swapchain_format(XrInstance instance,
 
 // functions belonging to extensions must be loaded with xrGetInstanceProcAddr before use
 PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
+PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT = NULL;
+PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
+
 static bool
 load_function_pointers(XrInstance instance)
 {
 	XrResult result =
 	    xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
 	                          (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
-	if (!xr_check(instance, result, "Failed to get OpenGL graphics requirements function!"))
+	if (!xr_check(instance, result, "Failed to get xrGetOpenGLGraphicsRequirementsKHR function!"))
 		return false;
+
+	// not fatal to run on a runtime without ht support
+	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
+	                               (PFN_xrVoidFunction*)&pfnLocateHandJointsEXT);
+	xr_check(instance, result, "Failed to get xrLocateHandJointsEXT function!");
+
+	result = xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT",
+	                               (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
+	xr_check(instance, result, "Failed to get xrCreateHandTrackerEXT function!");
 
 	return true;
 }
@@ -878,6 +902,8 @@ get_action_data(XrInstance instance,
 				action->pose_velocities[hand].type = XR_TYPE_SPACE_VELOCITY;
 				action->pose_velocities[hand].next = NULL;
 				action->pose_locations[hand].next = &action->pose_velocities[hand];
+			} else {
+				action->pose_locations[hand].next = NULL;
 			}
 
 			result = xrLocateSpace(action->pose_spaces[hand], space, time, &action->pose_locations[hand]);
@@ -892,6 +918,88 @@ get_action_data(XrInstance instance,
 
 	return true;
 }
+
+struct hand_tracking_t
+{
+	bool supported;
+	// whether the current VR system in use has hand tracking
+	bool system_supported;
+	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
+	XrHandTrackerEXT trackers[HAND_COUNT];
+
+	// out data
+	XrHandJointLocationEXT joints[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
+	XrHandJointLocationsEXT joint_locations[HAND_COUNT];
+
+	// optional
+	XrHandJointVelocitiesEXT joint_velocities[HAND_COUNT];
+	XrHandJointVelocityEXT joint_velocities_arr[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
+};
+
+static bool
+create_hand_trackers(XrInstance instance, XrSession session, struct hand_tracking_t* hand_tracking)
+{
+	XrResult result;
+
+	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
+	                               (PFN_xrVoidFunction*)&pfnLocateHandJointsEXT);
+
+	XrHandEXT hands[HAND_COUNT] = {
+	    [HAND_LEFT_INDEX] = XR_HAND_LEFT_EXT, [HAND_RIGHT_INDEX] = XR_HAND_RIGHT_EXT};
+
+	for (int i = 0; i < HAND_COUNT; i++) {
+		XrHandTrackerCreateInfoEXT hand_tracker_create_info = {
+		    .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+		    .next = NULL,
+		    .hand = hands[i],
+		    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
+		result =
+		    pfnCreateHandTrackerEXT(session, &hand_tracker_create_info, &hand_tracking->trackers[i]);
+		if (!xr_check(instance, result, "Failed to create hand tracker %d", i)) {
+			return false;
+		}
+
+		hand_tracking->joint_locations[i] = (XrHandJointLocationsEXT){
+		    .type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
+		    .jointCount = XR_HAND_JOINT_COUNT_EXT,
+		    .jointLocations = hand_tracking->joints[i],
+		};
+
+		printf("Created hand tracker %d\n", i);
+	}
+	return true;
+}
+
+static bool
+get_hand_tracking(XrInstance instance,
+                  XrSpace space,
+                  XrTime time,
+                  struct hand_tracking_t* hand_tracking,
+                  int hand)
+{
+	if (query_joint_velocities) {
+		hand_tracking->joint_velocities[hand].type = XR_TYPE_HAND_JOINT_VELOCITIES_EXT;
+		hand_tracking->joint_velocities[hand].next = NULL;
+		hand_tracking->joint_velocities[hand].jointCount = XR_HAND_JOINT_COUNT_EXT;
+		hand_tracking->joint_velocities[hand].jointVelocities =
+		    hand_tracking->joint_velocities_arr[hand];
+		hand_tracking->joint_locations[hand].next = &hand_tracking->joint_velocities[hand];
+	} else {
+		hand_tracking->joint_locations[hand].next = NULL;
+	}
+
+	XrHandJointsLocateInfoEXT locateInfo = {
+	    .type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT, .next = NULL, .baseSpace = space, .time = time};
+
+	XrResult result;
+	result = pfnLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
+	                                &hand_tracking->joint_locations[hand]);
+	if (!xr_check(instance, result, "failed to locate hand joints!"))
+		return false;
+
+	return true;
+}
+
 
 static char*
 get_arg(int argc, char** argv, char* opt)
@@ -964,6 +1072,8 @@ main(int argc, char** argv)
 		XrCompositionLayerDepthInfoKHR* infos;
 	} depth;
 
+	struct hand_tracking_t hand_tracking = {0};
+
 	struct gl_renderer_t gl_rendering = {
 	    .near_z = 0.01f,
 	    .far_z = 100.0f,
@@ -984,15 +1094,15 @@ main(int argc, char** argv)
 		return 1;
 
 
-	XrExtensionProperties extensionProperties[ext_count];
+	XrExtensionProperties extension_props[ext_count];
 	for (uint16_t i = 0; i < ext_count; i++) {
 		// we usually have to fill in the type (for validation) and set
 		// next to NULL (or a pointer to an extension specific struct)
-		extensionProperties[i].type = XR_TYPE_EXTENSION_PROPERTIES;
-		extensionProperties[i].next = NULL;
+		extension_props[i].type = XR_TYPE_EXTENSION_PROPERTIES;
+		extension_props[i].next = NULL;
 	}
 
-	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extensionProperties);
+	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extension_props);
 	if (!xr_check(NULL, result, "Failed to enumerate extension properties"))
 		return 1;
 
@@ -1000,14 +1110,15 @@ main(int argc, char** argv)
 
 	printf("Runtime supports %d extensions\n", ext_count);
 	for (uint32_t i = 0; i < ext_count; i++) {
-		printf("\t%s v%d\n", extensionProperties[i].extensionName,
-		       extensionProperties[i].extensionVersion);
-		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extensionProperties[i].extensionName) == 0) {
+		printf("\t%s v%d\n", extension_props[i].extensionName, extension_props[i].extensionVersion);
+		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extension_props[i].extensionName) == 0) {
 			has_opengl_ext = true;
 		}
-
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-		           extensionProperties[i].extensionName) == 0) {
+		if (strcmp(XR_EXT_HAND_TRACKING_EXTENSION_NAME, extension_props[i].extensionName) == 0) {
+			hand_tracking.supported = true;
+		}
+		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, extension_props[i].extensionName) ==
+		    0) {
 			depth.supported = true;
 		}
 	}
@@ -1021,7 +1132,11 @@ main(int argc, char** argv)
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
-	const char* enabled_exts[1] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	const char* enabled_exts[2] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	if (hand_tracking.supported) {
+		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
+	}
+
 	// same can be done for API layers, but API layers can also be enabled by env var
 
 	XrInstanceCreateInfo instance_create_info = {
@@ -1077,9 +1192,17 @@ main(int argc, char** argv)
 		    .trackingProperties = {0},
 		};
 
+		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
+		                                        .next = NULL};
+		if (hand_tracking.supported) {
+			system_props.next = &ht;
+		}
+
 		result = xrGetSystemProperties(instance, system_id, &system_props);
 		if (!xr_check(instance, result, "Failed to get System properties"))
 			return 1;
+
+		hand_tracking.system_supported = hand_tracking.supported && ht.supportsHandTracking;
 
 		print_system_properties(&system_props);
 	}
@@ -1332,6 +1455,10 @@ main(int argc, char** argv)
 		return 1;
 
 
+	if (hand_tracking.system_supported) {
+		if (!create_hand_trackers(instance, session, &hand_tracking))
+			return 1;
+	}
 
 	// Set up rendering (compile shaders, ...) before starting the session
 	if (init_gl(view_count, swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths, &gl_rendering) != 0) {
@@ -1509,6 +1636,7 @@ main(int argc, char** argv)
 		if (!xr_check(instance, result, "Could not locate views"))
 			break;
 
+
 		//! @todo Move this action processing to before xrWaitFrame, probably.
 		const XrActiveActionSet active_actionsets[] = {
 		    {.actionSet = gameplay_actionset, .subactionPath = XR_NULL_PATH}};
@@ -1559,6 +1687,10 @@ main(int argc, char** argv)
 				       accelerate_action.states[i].float_.changedSinceLastSync,
 				       accelerate_action.states[i].float_.currentState);
 			}
+
+			if (hand_tracking.system_supported) {
+				get_hand_tracking(instance, play_space, frameState.predictedDisplayTime, &hand_tracking, i);
+			}
 		};
 
 		// --- Begin frame
@@ -1599,7 +1731,7 @@ main(int argc, char** argv)
 			int w = viewconfig_views[i].recommendedImageRectWidth;
 			int h = viewconfig_views[i].recommendedImageRectHeight;
 			render_frame(w, h, &gl_rendering, projection_index, frameState.predictedDisplayTime, i,
-			             hand_pose_action.pose_locations, projection_matrix, view_matrix,
+			             hand_pose_action.pose_locations, &hand_tracking, projection_matrix, view_matrix,
 			             projection_image, depth.supported, depth_image);
 
 			glFinish();
@@ -1706,6 +1838,8 @@ MessageCallback(GLenum source,
                 const GLchar* message,
                 const void* userParam)
 {
+	if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+		return;
 	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
 	        (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
@@ -1912,6 +2046,13 @@ render_block(XrVector3f* position, XrQuaternionf* orientation, XrVector3f* radi,
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
+static void
+render_cube(XrVector3f* position, XrQuaternionf* orientation, float cube_size, int modelLoc)
+{
+	XrVector3f s = {cube_size / 2., cube_size / 2., cube_size / 2.};
+	render_block(position, orientation, &s, modelLoc);
+}
+
 void
 render_rotated_cube(
     vec3_t position, float cube_size, float rotation, float* projection_matrix, int modelLoc)
@@ -2003,6 +2144,7 @@ glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 #endif
 }
+
 void
 render_frame(int w,
              int h,
@@ -2011,6 +2153,7 @@ render_frame(int w,
              XrTime predictedDisplayTime,
              int view_index,
              XrSpaceLocation* hand_locations,
+             struct hand_tracking_t* hand_tracking,
              XrMatrix4x4f projectionmatrix,
              XrMatrix4x4f viewmatrix,
              GLuint image,
@@ -2070,19 +2213,57 @@ render_frame(int w,
 			glUniform3f(colorLoc, 0.5, 1.0, 0.5);
 		}
 
+
+		// if at least some joints had valid poses, draw them instead of controller blocks
+		bool any_joints_valid = false;
+
+		struct XrHandJointLocationsEXT* joint_locations = &hand_tracking->joint_locations[hand];
+		if (joint_locations->isActive) {
+			for (uint32_t i = 0; i < joint_locations->jointCount; i++) {
+				struct XrHandJointLocationEXT* joint_location = &joint_locations->jointLocations[i];
+
+				if (!(joint_location->locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
+					// printf("Hand %d Joint %d: Position not valid\n", hand, i);
+					continue;
+				}
+
+				float size = joint_location->radius;
+				render_cube(&joint_location->pose.position, &joint_location->pose.orientation, size,
+				            modelLoc);
+
+				if (joint_locations->next != NULL) {
+					// we set .next only to null or XrHandJointVelocitiesEXT in main
+					XrHandJointVelocitiesEXT* vel = (XrHandJointVelocitiesEXT*)joint_locations->next;
+					if ((vel->jointVelocities[i].velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
+						visualize_velocity(&joint_location->pose, &vel->jointVelocities[i].linearVelocity,
+						                   &vel->jointVelocities[i].angularVelocity, modelLoc, 0.005);
+					} else {
+						printf("Joint velocities %d invalid\n", i);
+					}
+				}
+
+				any_joints_valid = true;
+			}
+		}
+
+
+
 		bool hand_location_valid =
 		    //(spaceLocation[hand].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
 		    (hand_locations[hand].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
 
-		// draw a block at the controller pose
+		// don't draw blocks unless we know their position'
 		if (!hand_location_valid)
 			continue;
 
-		XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
-		render_block(&hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
-		             &scale, modelLoc);
+		// the controller blocks itself are only drawn if we didn't draw hand joints'
+		if (!any_joints_valid) {
+			XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
+			render_block(&hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
+			             &scale, modelLoc);
+		}
 
-
+		// controller velocities are always drawn if available
 		if (hand_locations[hand].next != NULL) {
 			// we set .next only to null or XrSpaceVelocity in main
 			XrSpaceVelocity* vel = (XrSpaceVelocity*)hand_locations[hand].next;
