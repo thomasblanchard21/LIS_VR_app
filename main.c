@@ -800,6 +800,7 @@ struct action_t
 	} states[HAND_COUNT];
 	XrSpace pose_spaces[HAND_COUNT];
 	XrSpaceLocation pose_locations[HAND_COUNT];
+	XrSpaceVelocity pose_velocities[HAND_COUNT];
 };
 
 bool
@@ -831,7 +832,8 @@ get_action_data(XrInstance instance,
                 int hand,
                 XrPath* subaction_paths,
                 XrSpace space,
-                XrTime time)
+                XrTime time,
+                bool velocities)
 {
 	XrActionStateGetInfo info = {
 	    .type = XR_TYPE_ACTION_STATE_GET_INFO,
@@ -871,6 +873,13 @@ get_action_data(XrInstance instance,
 		if (action->states[hand].pose_.isActive) {
 			action->pose_locations[hand].type = XR_TYPE_SPACE_LOCATION;
 			action->pose_locations[hand].next = NULL;
+
+			if (velocities) {
+				action->pose_velocities[hand].type = XR_TYPE_SPACE_VELOCITY;
+				action->pose_velocities[hand].next = NULL;
+				action->pose_locations[hand].next = &action->pose_velocities[hand];
+			}
+
 			result = xrLocateSpace(action->pose_spaces[hand], space, time, &action->pose_locations[hand]);
 			if (!xr_check(instance, result, "Failed to locate hand space"))
 				return false;
@@ -1514,13 +1523,15 @@ main(int argc, char** argv)
 
 		for (int i = 0; i < HAND_COUNT; i++) {
 			if (!get_action_data(instance, session, &hand_pose_action, i, hand_paths, play_space,
-			                     frameState.predictedDisplayTime))
+			                     frameState.predictedDisplayTime, query_hand_velocities))
 				;
 
-			if (!get_action_data(instance, session, &grab_action, i, hand_paths, XR_NULL_HANDLE, 0))
+			if (!get_action_data(instance, session, &grab_action, i, hand_paths, XR_NULL_HANDLE, 0,
+			                     false))
 				;
 
-			if (!get_action_data(instance, session, &accelerate_action, i, hand_paths, XR_NULL_HANDLE, 0))
+			if (!get_action_data(instance, session, &accelerate_action, i, hand_paths, XR_NULL_HANDLE, 0,
+			                     false))
 				;
 
 			if (grab_action.states[i].float_.isActive &&
@@ -1914,6 +1925,84 @@ render_rotated_cube(
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
+static float
+vec3_mag(XrVector3f* vec)
+{
+	return sqrt(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
+}
+
+static XrVector3f
+vec3_norm(XrVector3f* vec)
+{
+	float mag = vec3_mag(vec);
+	XrVector3f r = {.x = vec->x / mag, .y = vec->y / mag, .z = vec->z / mag};
+	return r;
+}
+
+static void
+visualize_velocity(XrPosef* base,
+                   XrVector3f* linearVelocity,
+                   XrVector3f* angularVelocity,
+                   int modelLoc,
+                   float size)
+{
+	float cube_radius = size / 2;
+	float lin_len = vec3_mag(linearVelocity);
+	float block_radius = lin_len / 2.;
+	XrVector3f lin_direction = vec3_norm(linearVelocity);
+
+#if 0
+	for (float i = 0; i < lin_len / size; i++) {
+		XrVector3f pos = base->position;
+		pos.x += lin_direction.x * size * i;
+		pos.y += lin_direction.y * size * i;
+		pos.z += lin_direction.z * size * i;
+		render_cube(&pos, &identity, cube_radius, modelLoc);
+}
+#endif
+
+
+// linear velocity
+#if 1
+	{
+		/* create matrix that translates lin_len / 2. in lin_direction (because
+		 * block origin is in the middle), scales to lin_len in "z" direction and
+		 * rotates in lin_direction. Used as model matrix for unit cube this renders
+		 * a block of length lin_len in lin_direction starting at the base pose.
+		 */
+		vec3_t from = vec3(base->position.x + lin_direction.x * block_radius / 2.,
+		                   base->position.y + lin_direction.y * block_radius / 2.,
+		                   base->position.z + lin_direction.z * block_radius / 2.);
+		vec3_t to = vec3(base->position.x + lin_direction.x, base->position.y + lin_direction.y,
+		                 base->position.z + lin_direction.z);
+		mat4_t look_at = m4_invert_affine(m4_look_at(from, to, vec3(0, 1, 0)));
+
+		mat4_t scale = m4_scaling(vec3(cube_radius, cube_radius, block_radius));
+		look_at = m4_mul(look_at, scale);
+
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)look_at.m);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+	}
+#endif
+
+// angular velocity - block is axis, length is velocity
+#if 0
+{
+vec3_t from = vec3(0, 0, 0);
+vec3_t to = vec3(angularVelocity->x / 2., angularVelocity->y / 2., angularVelocity->z / 2.0);
+mat4_t look_at = m4_invert_affine(m4_look_at(from, to, vec3(0, 1, 0)));
+
+float ang_len = vec3_mag(angularVelocity);
+mat4_t scale = m4_scaling(vec3(cube_radius, cube_radius, ang_len / 2.));
+look_at = m4_mul(look_at, scale);
+
+vec3_t pos = vec3(base->position.x, base->position.y, base->position.z);
+mat4_t model = m4_mul(m4_translation(pos), look_at);
+glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)model.m);
+glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+#endif
+}
 void
 render_frame(int w,
              int h,
@@ -1992,6 +2081,16 @@ render_frame(int w,
 		XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
 		render_block(&hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
 		             &scale, modelLoc);
+
+
+		if (hand_locations[hand].next != NULL) {
+			// we set .next only to null or XrSpaceVelocity in main
+			XrSpaceVelocity* vel = (XrSpaceVelocity*)hand_locations[hand].next;
+			if ((vel->velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
+				visualize_velocity(&hand_locations[hand].pose, &vel->linearVelocity, &vel->angularVelocity,
+				                   modelLoc, 0.005);
+			}
+		}
 	}
 
 
