@@ -51,7 +51,7 @@ Example of how to use expansion macros to make an enum-to-string function:
 	case name:                                                                                       \
 		return #name;
 #define XR_ENUM_STR(enumType)                                                                      \
-	const char* XrStr_##enumType(enumType e)                                                         \
+	const char* XrStr_##enumType(uint64_t e)                                                         \
 	{                                                                                                \
 		switch (e) {                                                                                   \
 			XR_LIST_ENUM_##enumType(XR_ENUM_CASE_STR) default : return "Unknown";                        \
@@ -1070,10 +1070,10 @@ get_hand_tracking(XrInstance instance,
 
 
 static char*
-get_arg(int argc, char** argv, char* opt)
+get_arg(int argc, char** argv, char* arg_name)
 {
 	for (int i = 0; i < argc; i++) {
-		if (strcmp(argv[i], opt) == 0 && i + 1 < argc - 1) {
+		if (strcmp(argv[i], arg_name) == 0 && i + 1 < argc) {
 			return argv[i + 1];
 		}
 	}
@@ -1081,19 +1081,24 @@ get_arg(int argc, char** argv, char* opt)
 }
 
 static void
-arg_to_enum(int argc, char** argv, char* argname, XrStr_fn fn, long* val_ptr)
+arg_to_enum(int argc, char** argv, char* arg_name, XrStr_fn fn, uint64_t* val_ptr)
 {
-	char* arg = get_arg(argc, argv, argname);
-	if (!arg) {
+	char* arg_value = get_arg(argc, argv, arg_name);
+	if (!arg_value) {
 		return;
 	}
+	printf("Parsing arg %s: %s\n", arg_name, arg_value);
 
 	for (long i = 0; i < 0x7FFFFFFF; i++) {
-		if (strcmp(fn(i), "unknown") == 0) {
+		// hack: not all enums start with 0
+		if (strcmp(fn(i), "Unknown") == 0 && i > 1) {
+			printf("no value found for arg %s %s\n", arg_name, arg_value);
 			return;
 		}
-		if (strcmp(fn(i), arg) == 0) {
+		if (strcmp(fn(i), arg_value) == 0) {
 			*val_ptr = i;
+			printf("parsed arg %s %s (%lu)\n", arg_name, arg_value, i);
+			return;
 		}
 	}
 }
@@ -1105,11 +1110,11 @@ main(int argc, char** argv)
 	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	XrReferenceSpaceType play_space_type = XR_REFERENCE_SPACE_TYPE_LOCAL;
 
-	arg_to_enum(argc, argv, "--form_factor", (XrStr_fn)XrStr_XrFormFactor, (long*)&form_factor);
+	arg_to_enum(argc, argv, "--form_factor", (XrStr_fn)XrStr_XrFormFactor, (uint64_t*)&form_factor);
 	arg_to_enum(argc, argv, "--view_type", (XrStr_fn)XrStr_XrViewConfigurationType,
-	            (long*)&view_type);
+	            (uint64_t*)&view_type);
 	arg_to_enum(argc, argv, "--play_space_type", (XrStr_fn)XrStr_XrReferenceSpaceType,
-	            (long*)&play_space_type);
+	            (uint64_t*)&play_space_type);
 
 	// every OpenXR app that displays something needs at least an instance and a session
 	XrInstance instance;
@@ -1728,15 +1733,15 @@ main(int argc, char** argv)
 		for (int i = 0; i < HAND_COUNT; i++) {
 			if (!get_action_data(instance, session, &hand_pose_action, i, hand_paths, play_space,
 			                     frameState.predictedDisplayTime, query_hand_velocities))
-				;
+				printf("Failed to get hand pose action datafor hand %d\n", i);
 
 			if (!get_action_data(instance, session, &grab_action, i, hand_paths, XR_NULL_HANDLE, 0,
 			                     false))
-				;
+				printf("Failed to get grab action data for hand %d\n", i);
 
 			if (!get_action_data(instance, session, &accelerate_action, i, hand_paths, XR_NULL_HANDLE, 0,
 			                     false))
-				;
+				printf("Failed to get accelerate action data for hand %d\n", i);
 
 			if (grab_action.states[i].float_.isActive &&
 			    grab_action.states[i].float_.currentState > 0.75) {
