@@ -358,6 +358,13 @@ struct gl_renderer_t
 
 	GLuint shader_program_id;
 	GLuint VAO;
+
+	struct
+	{
+		bool initialized;
+		GLuint texture;
+		GLuint fbo;
+	} quad;
 };
 
 struct hand_tracking_t;
@@ -389,6 +396,14 @@ render_frame(int w,
              GLuint image,
              bool depth_supported,
              GLuint depthbuffer);
+
+struct quad_layer_t;
+void
+render_quad(struct gl_renderer_t* gl_rendering,
+            struct quad_layer_t* quad,
+            uint32_t swapchain_index,
+            XrTime predictedDisplayTime);
+
 #endif
 // =============================================================================
 
@@ -633,69 +648,112 @@ struct swapchain_t
 	uint32_t* swapchain_lengths;
 	XrSwapchainImageOpenGLKHR** images;
 	XrSwapchain* swapchains;
+	uint32_t swapchain_count;
 };
 
 enum Swapchain
 {
 	SWAPCHAIN_PROJECTION = 0,
-	SWAPCHAIN_QUAD,
-	SWAPCHAIN_CYLINDER,
 	SWAPCHAIN_DEPTH,
 	SWAPCHAIN_LAST
 };
 
-// --- Create swapchain for main VR rendering
+// --- Create swapchain
 static bool
-create_swapchain(XrInstance instance,
-                 XrSession session,
-                 struct swapchain_t* swapchain,
-                 uint32_t view_count,
-                 int64_t format,
-                 XrViewConfigurationView* viewconfig_views,
-                 XrSwapchainUsageFlags usage_flags)
+_create_swapchain(XrInstance instance,
+                  XrSession session,
+                  struct swapchain_t* swapchain,
+                  int num_swapchain,
+                  int64_t format,
+                  uint32_t sample_count,
+                  uint32_t w,
+                  uint32_t h,
+                  XrSwapchainUsageFlags usage_flags)
 {
-	// In the frame loop we render into OpenGL textures we receive from the runtime here.
+	XrSwapchainCreateInfo swapchain_create_info = {
+	    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+	    .usageFlags = usage_flags,
+	    .createFlags = 0,
+	    .format = format,
+	    .sampleCount = sample_count,
+	    .width = w,
+	    .height = h,
+	    .faceCount = 1,
+	    .arraySize = 1,
+	    .mipCount = 1,
+	    .next = NULL,
+	};
+
+	XrResult result;
+
+	result =
+	    xrCreateSwapchain(session, &swapchain_create_info, &swapchain->swapchains[num_swapchain]);
+	if (!xr_check(instance, result, "Failed to create swapchain!"))
+		return false;
+
+	// The runtime controls how many textures we have to be able to render to
+	// (e.g. "triple buffering")
+	result = xrEnumerateSwapchainImages(swapchain->swapchains[num_swapchain], 0,
+	                                    &swapchain->swapchain_lengths[num_swapchain], NULL);
+	if (!xr_check(instance, result, "Failed to enumerate swapchains"))
+		return false;
+
+	swapchain->images[num_swapchain] =
+	    malloc(sizeof(XrSwapchainImageOpenGLKHR) * swapchain->swapchain_lengths[num_swapchain]);
+	for (uint32_t j = 0; j < swapchain->swapchain_lengths[num_swapchain]; j++) {
+		swapchain->images[num_swapchain][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+		swapchain->images[num_swapchain][j].next = NULL;
+	}
+	result = xrEnumerateSwapchainImages(
+	    swapchain->swapchains[num_swapchain], swapchain->swapchain_lengths[num_swapchain],
+	    &swapchain->swapchain_lengths[num_swapchain],
+	    (XrSwapchainImageBaseHeader*)swapchain->images[num_swapchain]);
+	if (!xr_check(instance, result, "Failed to enumerate swapchain images"))
+		return false;
+
+	return true;
+}
+
+static bool
+create_one_swapchain(XrInstance instance,
+                     XrSession session,
+                     struct swapchain_t* swapchain,
+                     int64_t format,
+                     uint32_t sample_count,
+                     uint32_t w,
+                     uint32_t h,
+                     XrSwapchainUsageFlags usage_flags)
+{
+	swapchain->swapchains = malloc(sizeof(XrSwapchain));
+	swapchain->swapchain_lengths = malloc(sizeof(uint32_t));
+	swapchain->images = malloc(sizeof(XrSwapchainImageOpenGLKHR*));
+	swapchain->swapchain_count = 1;
+
+	return _create_swapchain(instance, session, swapchain, 0, format, sample_count, w, h,
+	                         usage_flags);
+}
+
+static bool
+create_swapchain_from_views(XrInstance instance,
+                            XrSession session,
+                            struct swapchain_t* swapchain,
+                            uint32_t view_count,
+                            int64_t format,
+                            XrViewConfigurationView* viewconfig_views,
+                            XrSwapchainUsageFlags usage_flags)
+{
 	swapchain->swapchains = malloc(sizeof(XrSwapchain) * view_count);
 	swapchain->swapchain_lengths = malloc(sizeof(uint32_t) * view_count);
 	swapchain->images = malloc(sizeof(XrSwapchainImageOpenGLKHR*) * view_count);
+	swapchain->swapchain_count = view_count;
+
 	for (uint32_t i = 0; i < view_count; i++) {
-		XrSwapchainCreateInfo swapchain_create_info = {
-		    .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
-		    .usageFlags = usage_flags,
-		    .createFlags = 0,
-		    .format = format,
-		    .sampleCount = viewconfig_views[i].recommendedSwapchainSampleCount,
-		    .width = viewconfig_views[i].recommendedImageRectWidth,
-		    .height = viewconfig_views[i].recommendedImageRectHeight,
-		    .faceCount = 1,
-		    .arraySize = 1,
-		    .mipCount = 1,
-		    .next = NULL,
-		};
+		uint32_t sample_count = viewconfig_views[i].recommendedSwapchainSampleCount;
+		uint32_t w = viewconfig_views[i].recommendedImageRectWidth;
+		uint32_t h = viewconfig_views[i].recommendedImageRectHeight;
 
-		XrResult result;
-
-		result = xrCreateSwapchain(session, &swapchain_create_info, &swapchain->swapchains[i]);
-		if (!xr_check(instance, result, "Failed to create swapchain %d!", i))
-			return false;
-
-		// The runtime controls how many textures we have to be able to render to
-		// (e.g. "triple buffering")
-		result = xrEnumerateSwapchainImages(swapchain->swapchains[i], 0,
-		                                    &swapchain->swapchain_lengths[i], NULL);
-		if (!xr_check(instance, result, "Failed to enumerate swapchains"))
-			return false;
-
-		swapchain->images[i] =
-		    malloc(sizeof(XrSwapchainImageOpenGLKHR) * swapchain->swapchain_lengths[i]);
-		for (uint32_t j = 0; j < swapchain->swapchain_lengths[i]; j++) {
-			swapchain->images[i][j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-			swapchain->images[i][j].next = NULL;
-		}
-		result = xrEnumerateSwapchainImages(swapchain->swapchains[i], swapchain->swapchain_lengths[i],
-		                                    &swapchain->swapchain_lengths[i],
-		                                    (XrSwapchainImageBaseHeader*)swapchain->images[i]);
-		if (!xr_check(instance, result, "Failed to enumerate swapchain images"))
+		if (!_create_swapchain(instance, session, swapchain, i, format, sample_count, w, h,
+		                       usage_flags))
 			return false;
 	}
 
@@ -703,18 +761,21 @@ create_swapchain(XrInstance instance,
 }
 
 static bool
-acquire_swapchain(XrInstance instance, struct swapchain_t* swapchain, int view, uint32_t* index)
+acquire_swapchain(XrInstance instance,
+                  struct swapchain_t* swapchain,
+                  int num_swapchain,
+                  uint32_t* index)
 {
 	XrResult result;
 	XrSwapchainImageAcquireInfo acquire_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
 	                                            .next = NULL};
-	result = xrAcquireSwapchainImage(swapchain->swapchains[view], &acquire_info, index);
+	result = xrAcquireSwapchainImage(swapchain->swapchains[num_swapchain], &acquire_info, index);
 	if (!xr_check(instance, result, "failed to acquire swapchain image!"))
 		return false;
 
 	XrSwapchainImageWaitInfo wait_info = {
 	    .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, .next = NULL, .timeout = 1000};
-	result = xrWaitSwapchainImage(swapchain->swapchains[view], &wait_info);
+	result = xrWaitSwapchainImage(swapchain->swapchains[num_swapchain], &wait_info);
 	if (!xr_check(instance, result, "failed to wait for swapchain image!"))
 		return false;
 
@@ -936,6 +997,13 @@ struct hand_tracking_t
 	XrHandJointVelocityEXT joint_velocities_arr[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
 };
 
+struct quad_layer_t
+{
+	// quad layers are placed into world space, no need to render them per eye
+	struct swapchain_t swapchain;
+	uint32_t pixel_width, pixel_height;
+};
+
 static bool
 create_hand_trackers(XrInstance instance, XrSession session, struct hand_tracking_t* hand_tracking)
 {
@@ -1061,7 +1129,9 @@ main(int argc, char** argv)
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
 	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl;
 
-	struct swapchain_t swapchains[SWAPCHAIN_LAST];
+	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
+
+	struct quad_layer_t quad_layer = {.pixel_width = 320, .pixel_height = 240};
 
 	XrPath hand_paths[HAND_COUNT];
 
@@ -1303,6 +1373,8 @@ main(int argc, char** argv)
 	// a more sophisticated approach would iterate supported swapchain formats and choose from them
 	int64_t color_format = get_swapchain_format(instance, session, GL_SRGB8_ALPHA8_EXT, true);
 
+	int64_t quad_format = get_swapchain_format(instance, session, GL_RGBA8_EXT, true);
+
 	// GL_DEPTH_COMPONENT32F is a good bet
 	int64_t depth_format = get_swapchain_format(instance, session, GL_DEPTH_COMPONENT32F, false);
 	if (depth_format < 0) {
@@ -1312,18 +1384,21 @@ main(int argc, char** argv)
 
 	XrSwapchainUsageFlags color_flags =
 	    XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-	if (!create_swapchain(instance, session, &swapchains[SWAPCHAIN_PROJECTION], view_count,
-	                      color_format, viewconfig_views, color_flags))
+	if (!create_swapchain_from_views(instance, session, &vr_swapchains[SWAPCHAIN_PROJECTION],
+	                                 view_count, color_format, viewconfig_views, color_flags))
 		return 1;
 
 	if (depth.supported) {
 		XrSwapchainUsageFlags depth_flags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		if (!create_swapchain(instance, session, &swapchains[SWAPCHAIN_DEPTH], view_count, depth_format,
-		                      viewconfig_views, depth_flags)) {
+		if (!create_swapchain_from_views(instance, session, &vr_swapchains[SWAPCHAIN_DEPTH], view_count,
+		                                 depth_format, viewconfig_views, depth_flags)) {
 			return 1;
 		}
 	}
 
+	if (!create_one_swapchain(instance, session, &quad_layer.swapchain, quad_format, 1,
+	                          quad_layer.pixel_width, quad_layer.pixel_height, color_flags))
+		return 1;
 
 	// Do not allocate these every frame to save some resources
 	views = (XrView*)malloc(sizeof(XrView) * view_count);
@@ -1336,7 +1411,7 @@ main(int argc, char** argv)
 		projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
 		projection_views[i].next = NULL;
 
-		projection_views[i].subImage.swapchain = swapchains[SWAPCHAIN_PROJECTION].swapchains[i];
+		projection_views[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i];
 		projection_views[i].subImage.imageArrayIndex = 0;
 		projection_views[i].subImage.imageRect.offset.x = 0;
 		projection_views[i].subImage.imageRect.offset.y = 0;
@@ -1360,7 +1435,7 @@ main(int argc, char** argv)
 			depth.infos[i].nearZ = gl_rendering.near_z;
 			depth.infos[i].farZ = gl_rendering.far_z;
 
-			depth.infos[i].subImage.swapchain = swapchains[SWAPCHAIN_DEPTH].swapchains[i];
+			depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
 
 			depth.infos[i].subImage.imageArrayIndex = 0;
 			depth.infos[i].subImage.imageRect.offset.x = 0;
@@ -1461,7 +1536,8 @@ main(int argc, char** argv)
 	}
 
 	// Set up rendering (compile shaders, ...) before starting the session
-	if (init_gl(view_count, swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths, &gl_rendering) != 0) {
+	if (init_gl(view_count, vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths, &gl_rendering) !=
+	    0) {
 		printf("OpenGl setup failed!\n");
 		return 1;
 	}
@@ -1700,8 +1776,11 @@ main(int argc, char** argv)
 		if (!xr_check(instance, result, "failed to begin frame!"))
 			break;
 
+		// all swapchain release infos happen to be the same
+		XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
+		                                            .next = NULL};
 
-		// render each eye and fill projection_views with the result
+		// render projection layer (once per view) and fill projection_views with the result
 		for (uint32_t i = 0; i < view_count; i++) {
 			XrMatrix4x4f projection_matrix;
 			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov,
@@ -1713,20 +1792,18 @@ main(int argc, char** argv)
 
 
 			uint32_t projection_index;
-			if (!acquire_swapchain(instance, &swapchains[SWAPCHAIN_PROJECTION], i, &projection_index))
+			if (!acquire_swapchain(instance, &vr_swapchains[SWAPCHAIN_PROJECTION], i, &projection_index))
 				break;
 
 			uint32_t depth_index = 0;
 			if (depth.supported) {
-				if (!acquire_swapchain(instance, &swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
+				if (!acquire_swapchain(instance, &vr_swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
 					break;
 			}
 
-			projection_views[i].pose = views[i].pose;
-			projection_views[i].fov = views[i].fov;
-
-			GLuint depth_image = swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image;
-			GLuint projection_image = swapchains[SWAPCHAIN_PROJECTION].images[i][projection_index].image;
+			GLuint depth_image = vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image;
+			GLuint projection_image =
+			    vr_swapchains[SWAPCHAIN_PROJECTION].images[i][projection_index].image;
 
 			int w = viewconfig_views[i].recommendedImageRectWidth;
 			int h = viewconfig_views[i].recommendedImageRectHeight;
@@ -1734,23 +1811,33 @@ main(int argc, char** argv)
 			             hand_pose_action.pose_locations, &hand_tracking, projection_matrix, view_matrix,
 			             projection_image, depth.supported, depth_image);
 
-			glFinish();
-			XrSwapchainImageReleaseInfo release_info = {.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-			                                            .next = NULL};
 			result =
-			    xrReleaseSwapchainImage(swapchains[SWAPCHAIN_PROJECTION].swapchains[i], &release_info);
+			    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i], &release_info);
 			if (!xr_check(instance, result, "failed to release swapchain image!"))
 				break;
 
 			if (depth.supported) {
-				XrSwapchainImageReleaseInfo depth_release_info = {
-				    .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = NULL};
 				result =
-				    xrReleaseSwapchainImage(swapchains[SWAPCHAIN_DEPTH].swapchains[i], &depth_release_info);
+				    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i], &release_info);
 				if (!xr_check(instance, result, "failed to release swapchain image!"))
 					break;
 			}
+
+			projection_views[i].pose = views[i].pose;
+			projection_views[i].fov = views[i].fov;
 		}
+
+
+		uint32_t quad_index = 0;
+		if (!acquire_swapchain(instance, &quad_layer.swapchain, 0, &quad_index))
+			break;
+
+		render_quad(&gl_rendering, &quad_layer, quad_index, frameState.predictedDisplayTime);
+
+		result = xrReleaseSwapchainImage(quad_layer.swapchain.swapchains[0], &release_info);
+		if (!xr_check(instance, result, "failed to release swapchain image!"))
+			break;
+
 
 		// projectionLayers struct reused for every frame
 		XrCompositionLayerProjection projection_layer = {
@@ -1762,9 +1849,34 @@ main(int argc, char** argv)
 		    .views = projection_views,
 		};
 
+
+		float quad_aspect = (float)quad_layer.pixel_width / (float)quad_layer.pixel_height;
+		float quad_width = 1.f;
+		XrCompositionLayerQuad quad_comp_layer = {
+		    .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
+		    .next = NULL,
+		    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
+		    .space = play_space,
+		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
+		             .position = {.x = 1.5f, .y = .7f, .z = -1.5f}},
+		    .size = {.width = quad_width, .height = quad_width / quad_aspect},
+		    .subImage = {
+		        .swapchain = quad_layer.swapchain.swapchains[0],
+		        .imageRect = {
+		            .offset = {.x = 0, .y = 0},
+		            .extent = {.width = quad_layer.pixel_width, .height = quad_layer.pixel_height},
+		        }}};
+
+
 		int submitted_layer_count = 1;
-		const XrCompositionLayerBaseHeader* submittedLayers[1] = {
+		const XrCompositionLayerBaseHeader* submitted_layers[2] = {
 		    (const XrCompositionLayerBaseHeader* const) & projection_layer};
+		// already set projection_views[i].next = &depth.infos[i]; if depth supported
+
+
+		submitted_layers[submitted_layer_count++] =
+		    (const XrCompositionLayerBaseHeader* const) & quad_comp_layer;
 
 		if ((view_state.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0) {
 			printf("Not submitting layers because orientation is invalid\n");
@@ -1774,7 +1886,7 @@ main(int argc, char** argv)
 		XrFrameEndInfo frameEndInfo = {.type = XR_TYPE_FRAME_END_INFO,
 		                               .displayTime = frameState.predictedDisplayTime,
 		                               .layerCount = submitted_layer_count,
-		                               .layers = submittedLayers,
+		                               .layers = submitted_layers,
 		                               .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
 		                               .next = NULL};
 		result = xrEndFrame(session, &frameEndInfo);
@@ -1790,12 +1902,12 @@ main(int argc, char** argv)
 	xrDestroySession(session);
 
 	for (uint32_t i = 0; i < view_count; i++) {
-		free(swapchains[SWAPCHAIN_PROJECTION].images[i]);
+		free(vr_swapchains[SWAPCHAIN_PROJECTION].images[i]);
 		if (depth.supported) {
-			free(swapchains[SWAPCHAIN_DEPTH].images[i]);
+			free(vr_swapchains[SWAPCHAIN_DEPTH].images[i]);
 		}
 
-		glDeleteFramebuffers(swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths[i],
+		glDeleteFramebuffers(vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths[i],
 		                     gl_rendering.framebuffers[i]);
 		free(gl_rendering.framebuffers[i]);
 	}
@@ -1805,8 +1917,8 @@ main(int argc, char** argv)
 	free(projection_views);
 	free(views);
 
-	destroy_swapchain(&swapchains[SWAPCHAIN_PROJECTION]);
-	destroy_swapchain(&swapchains[SWAPCHAIN_DEPTH]);
+	destroy_swapchain(&vr_swapchains[SWAPCHAIN_PROJECTION]);
+	destroy_swapchain(&vr_swapchains[SWAPCHAIN_DEPTH]);
 	free(gl_rendering.framebuffers);
 
 	free(depth.infos);
@@ -2294,5 +2406,77 @@ render_frame(int w,
 		SDL_GL_SwapWindow(desktop_window);
 	}
 }
+
+void
+initialze_quad(struct gl_renderer_t* gl_rendering, struct quad_layer_t* quad)
+{
+	glGenTextures(1, &gl_rendering->quad.texture);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gl_rendering->quad.texture);
+
+	int w = quad->pixel_width;
+	int h = quad->pixel_height;
+	glViewport(0, 0, w, h);
+	glScissor(0, 0, w, h);
+
+	uint8_t* rgb = malloc(sizeof(uint8_t) * w * h * 4);
+	for (int row = 0; row < h; row++) {
+		for (int col = 0; col < w; col++) {
+			uint8_t* base = &rgb[(row * w * 4 + col * 4)];
+			*(base + 0) = (((float)row / (float)h)) * 255.;
+			*(base + 1) = 0;
+			*(base + 2) = 0;
+			*(base + 3) = 255;
+
+			if (abs(row - col) < 3) {
+				*(base + 0) = 255.;
+				*(base + 1) = 255;
+				*(base + 2) = 255;
+				*(base + 3) = 255;
+			}
+
+			if (abs((w - col) - (row)) < 3) {
+				*(base + 0) = 0.;
+				*(base + 1) = 0;
+				*(base + 2) = 0;
+				*(base + 3) = 255;
+			}
+		}
+	}
+
+	// TODO respect format
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+	             (GLvoid*)rgb);
+	free(rgb);
+
+	glGenFramebuffers(1, &gl_rendering->quad.fbo);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_rendering->quad.fbo);
+	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+	                       gl_rendering->quad.texture, 0);
+
+	gl_rendering->quad.initialized = true;
+}
+
+void
+render_quad(struct gl_renderer_t* gl_rendering,
+            struct quad_layer_t* quad,
+            uint32_t swapchain_index,
+            XrTime predictedDisplayTime)
+{
+	if (!gl_rendering->quad.initialized) {
+		printf("Creating Quad texture\n");
+		initialze_quad(gl_rendering, quad);
+	}
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_rendering->quad.fbo);
+
+	GLuint texture = quad->swapchain.images[0][swapchain_index].image;
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, quad->pixel_width, quad->pixel_height);
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+}
+
 
 #endif
