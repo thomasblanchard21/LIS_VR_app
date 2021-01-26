@@ -622,7 +622,7 @@ PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT = NULL;
 PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
 
 static bool
-load_function_pointers(XrInstance instance)
+load_extension_function_pointers(XrInstance instance)
 {
 	XrResult result =
 	    xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
@@ -1240,7 +1240,7 @@ main(int argc, char** argv)
 	if (!xr_check(NULL, result, "Failed to create XR instance."))
 		return 1;
 
-	if (!load_function_pointers(instance))
+	if (!load_extension_function_pointers(instance))
 		return 1;
 
 	// Optionally get runtime name and version
@@ -1380,10 +1380,9 @@ main(int argc, char** argv)
 
 	int64_t quad_format = get_swapchain_format(instance, session, GL_RGBA8_EXT, true);
 
-	// GL_DEPTH_COMPONENT32F is a good bet
-	int64_t depth_format = get_swapchain_format(instance, session, GL_DEPTH_COMPONENT32F, false);
+	int64_t depth_format = get_swapchain_format(instance, session, GL_DEPTH_COMPONENT16, false);
 	if (depth_format < 0) {
-		printf("Preferred depth format GL_DEPTH_COMPONENT32F not supported, disabling depth\n");
+		printf("Preferred depth format GL_DEPTH_COMPONENT16 not supported, disabling depth\n");
 		depth.supported = false;
 	}
 
@@ -1806,7 +1805,7 @@ main(int argc, char** argv)
 					break;
 			}
 
-			GLuint depth_image = vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image;
+			GLuint depth_image = depth.supported ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image : 0;
 			GLuint projection_image =
 			    vr_swapchains[SWAPCHAIN_PROJECTION].images[i][projection_index].image;
 
