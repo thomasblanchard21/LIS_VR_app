@@ -10,14 +10,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-
-// use optional XrSpaceVelocity in xrLocateSpace for controllers and visualize linear velocity
-const bool query_hand_velocities = true;
-
-// use optional XrSpaceVelocity in xrLocateHandJointsEXT and visualize linear velocity
-const bool query_joint_velocities = false;
-
-
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 #ifdef __linux__
@@ -1042,6 +1034,7 @@ static bool
 get_hand_tracking(XrInstance instance,
                   XrSpace space,
                   XrTime time,
+                  bool query_joint_velocities,
                   struct hand_tracking_t* hand_tracking,
                   int hand)
 {
@@ -1110,11 +1103,23 @@ main(int argc, char** argv)
 	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	XrReferenceSpaceType play_space_type = XR_REFERENCE_SPACE_TYPE_LOCAL;
 
+	// use optional XrSpaceVelocity in xrLocateSpace for controllers and visualize linear velocity
+	bool query_hand_velocities = true;
+
+	// use optional XrSpaceVelocity in xrLocateHandJointsEXT and visualize linear velocity
+	bool query_joint_velocities = false;
+
 	arg_to_enum(argc, argv, "--form_factor", (XrStr_fn)XrStr_XrFormFactor, (uint64_t*)&form_factor);
 	arg_to_enum(argc, argv, "--view_type", (XrStr_fn)XrStr_XrViewConfigurationType,
 	            (uint64_t*)&view_type);
 	arg_to_enum(argc, argv, "--play_space_type", (XrStr_fn)XrStr_XrReferenceSpaceType,
 	            (uint64_t*)&play_space_type);
+
+	for (int i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "--joint_velocities") == 0) {
+			query_joint_velocities = true;
+		}
+	}
 
 	// every OpenXR app that displays something needs at least an instance and a session
 	XrInstance instance;
@@ -1773,7 +1778,8 @@ main(int argc, char** argv)
 			}
 
 			if (hand_tracking.system_supported) {
-				get_hand_tracking(instance, play_space, frameState.predictedDisplayTime, &hand_tracking, i);
+				get_hand_tracking(instance, play_space, frameState.predictedDisplayTime,
+				                  query_joint_velocities, &hand_tracking, i);
 			}
 		};
 
