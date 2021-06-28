@@ -1122,22 +1122,22 @@ main(int argc, char** argv)
 	}
 
 	// every OpenXR app that displays something needs at least an instance and a session
-	XrInstance instance;
-	XrSession session;
-	XrSystemId system_id;
-	XrSessionState state;
+	XrInstance instance = XR_NULL_HANDLE;
+	XrSession session = XR_NULL_HANDLE;
+	XrSystemId system_id = XR_NULL_SYSTEM_ID;
+	XrSessionState state = XR_SESSION_STATE_UNKNOWN;
 
 	// Play space is usually local (head is origin, seated) or stage (room scale)
-	XrSpace play_space;
+	XrSpace play_space = XR_NULL_HANDLE;
 
 	// Each physical Display/Eye is described by a view
-	uint32_t view_count;
-	XrViewConfigurationView* viewconfig_views;
-	XrCompositionLayerProjectionView* projection_views;
-	XrView* views;
+	uint32_t view_count = 0;
+	XrViewConfigurationView* viewconfig_views = NULL;
+	XrCompositionLayerProjectionView* projection_views = NULL;
+	XrView* views = NULL;
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
-	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl;
+	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl = {0};
 
 	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
 
