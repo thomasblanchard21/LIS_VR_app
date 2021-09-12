@@ -641,10 +641,22 @@ struct depth_t
 	XrCompositionLayerDepthInfoKHR* infos;
 };
 
+
+struct refresh_rate_t
+{
+	bool supported;
+	uint32_t version;
+
+	PFN_xrEnumerateDisplayRefreshRatesFB pfnxrEnumerateDisplayRefreshRatesFB;
+	PFN_xrGetDisplayRefreshRateFB pfnxrGetDisplayRefreshRateFB;
+	PFN_xrRequestDisplayRefreshRateFB pfnxrRequestDisplayRefreshRateFB;
+};
+
 struct ext_t
 {
 	struct opengl_t opengl;
 	struct hand_tracking_t hand_tracking;
+	struct refresh_rate_t refresh_rate;
 
 	// technically not extensions, but can be supported or not
 	struct depth_t depth;
@@ -687,6 +699,10 @@ _init_opengl_ext(XrInstance instance, struct ext_t* ext)
 static XrResult
 _init_hand_tracking_ext(XrInstance instance, struct ext_t* ext)
 {
+	if (!ext->hand_tracking.supported) {
+		return XR_SUCCESS;
+	}
+
 	XrResult result;
 	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
 	                               (PFN_xrVoidFunction*)&ext->hand_tracking.pfnLocateHandJointsEXT);
@@ -699,6 +715,38 @@ _init_hand_tracking_ext(XrInstance instance, struct ext_t* ext)
 	if (!xr_check(instance, result, "Failed to get xrCreateHandTrackerEXT function!")) {
 		return result;
 	}
+	return XR_SUCCESS;
+}
+
+static XrResult
+_init_refresh_rate_ext(XrInstance instance, struct ext_t* ext)
+{
+	if (!ext->refresh_rate.supported) {
+		return XR_SUCCESS;
+	}
+
+	XrResult result;
+	result = xrGetInstanceProcAddr(
+	    instance, "xrEnumerateDisplayRefreshRatesFB",
+	    (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB);
+	if (!xr_check(instance, result, "Failed to get xrEnumerateDisplayRefreshRatesFB function!")) {
+		return result;
+	}
+
+	result =
+	    xrGetInstanceProcAddr(instance, "xrGetDisplayRefreshRateFB",
+	                          (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrGetDisplayRefreshRateFB);
+	if (!xr_check(instance, result, "Failed to get xrGetDisplayRefreshRateFB function!")) {
+		return result;
+	}
+
+	result = xrGetInstanceProcAddr(
+	    instance, "xrRequestDisplayRefreshRateFB",
+	    (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrRequestDisplayRefreshRateFB);
+	if (!xr_check(instance, result, "Failed to get xrRequestDisplayRefreshRateFB function!")) {
+		return result;
+	}
+
 	return XR_SUCCESS;
 }
 
@@ -752,6 +800,12 @@ _check_extension_support(struct ext_t* ext)
 		    _extension_version(ext_props, ext_count, XR_EXT_HAND_TRACKING_EXTENSION_NAME);
 	}
 
+	if (_extension_supported(ext_props, ext_count, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME)) {
+		ext->refresh_rate.supported = true;
+		ext->refresh_rate.version =
+		    _extension_version(ext_props, ext_count, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
+	}
+
 	return XR_SUCCESS;
 }
 
@@ -763,11 +817,18 @@ _init_extensions(XrInstance instance, struct ext_t* ext)
 	// opengl is required
 	result = _init_opengl_ext(instance, ext);
 	if (!xr_check(instance, result, "Failed to init OpenGL ext")) {
-		return XR_ERROR_EXTENSION_NOT_PRESENT;
+		return result;
 	}
 
-	// those may succeed or not
 	result = _init_hand_tracking_ext(instance, ext);
+	if (!xr_check(instance, result, "Failed to init hand tracking ext")) {
+		return result;
+	}
+
+	result = _init_refresh_rate_ext(instance, ext);
+	if (!xr_check(instance, result, "Failed to init fb refresh reate ext")) {
+		return result;
+	}
 
 	return XR_SUCCESS;
 }
@@ -1282,9 +1343,17 @@ main(int argc, char** argv)
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
-	const char* enabled_exts[2] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	const char* enabled_exts[3] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+	printf("enabling extension %s\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+
 	if (ext.hand_tracking.supported) {
 		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
+		printf("enabling extension %s\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME);
+	}
+
+	if (ext.refresh_rate.supported) {
+		enabled_exts[enabled_ext_count++] = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME;
+		printf("enabling extension %s\n", XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
 	}
 
 	// same can be done for API layers, but API layers can also be enabled by env var
