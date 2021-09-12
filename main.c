@@ -606,34 +606,171 @@ get_swapchain_format(XrInstance instance,
 	return chosen_format;
 }
 
+struct opengl_t
+{
+	bool supported;
+	uint32_t version;
+	// functions belonging to extensions must be loaded with xrGetInstanceProcAddr before use
+	PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR;
+};
 
+struct hand_tracking_t
+{
+	bool supported;
+	uint32_t version;
 
-// functions belonging to extensions must be loaded with xrGetInstanceProcAddr before use
-PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
-PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT = NULL;
-PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT = NULL;
+	// whether the current VR system in use has hand tracking
+	bool system_supported;
+	XrHandTrackerEXT trackers[HAND_COUNT];
+
+	// out data
+	XrHandJointLocationEXT joints[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
+	XrHandJointLocationsEXT joint_locations[HAND_COUNT];
+
+	// optional
+	XrHandJointVelocitiesEXT joint_velocities[HAND_COUNT];
+	XrHandJointVelocityEXT joint_velocities_arr[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
+
+	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
+	PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT;
+};
+
+struct depth_t
+{
+	bool supported;
+	XrCompositionLayerDepthInfoKHR* infos;
+};
+
+struct ext_t
+{
+	struct opengl_t opengl;
+	struct hand_tracking_t hand_tracking;
+
+	// technically not extensions, but can be supported or not
+	struct depth_t depth;
+};
+
 
 static bool
-load_extension_function_pointers(XrInstance instance)
+_extension_supported(XrExtensionProperties* extension_props, uint32_t ext_count, char* ext_name)
+{
+	for (uint32_t i = 0; i < ext_count; i++) {
+		if (strcmp(ext_name, extension_props[i].extensionName) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static uint32_t
+_extension_version(XrExtensionProperties* extension_props, uint32_t ext_count, char* ext_name)
+{
+	for (uint32_t i = 0; i < ext_count; i++) {
+		if (strcmp(ext_name, extension_props[i].extensionName) == 0) {
+			return extension_props[i].extensionVersion;
+		}
+	}
+	return 0;
+}
+
+static XrResult
+_init_opengl_ext(XrInstance instance, struct ext_t* ext)
 {
 	XrResult result =
 	    xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
-	                          (PFN_xrVoidFunction*)&pfnGetOpenGLGraphicsRequirementsKHR);
+	                          (PFN_xrVoidFunction*)&ext->opengl.pfnGetOpenGLGraphicsRequirementsKHR);
 	if (!xr_check(instance, result, "Failed to get xrGetOpenGLGraphicsRequirementsKHR function!"))
-		return false;
-
-	// not fatal to run on a runtime without ht support
-	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
-	                               (PFN_xrVoidFunction*)&pfnLocateHandJointsEXT);
-	xr_check(instance, result, "Failed to get xrLocateHandJointsEXT function!");
-
-	result = xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT",
-	                               (PFN_xrVoidFunction*)&pfnCreateHandTrackerEXT);
-	xr_check(instance, result, "Failed to get xrCreateHandTrackerEXT function!");
-
-	return true;
+		return result;
+	return XR_SUCCESS;
 }
 
+static XrResult
+_init_hand_tracking_ext(XrInstance instance, struct ext_t* ext)
+{
+	XrResult result;
+	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
+	                               (PFN_xrVoidFunction*)&ext->hand_tracking.pfnLocateHandJointsEXT);
+	if (!xr_check(instance, result, "Failed to get xrLocateHandJointsEXT function!")) {
+		return result;
+	}
+
+	result = xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT",
+	                               (PFN_xrVoidFunction*)&ext->hand_tracking.pfnCreateHandTrackerEXT);
+	if (!xr_check(instance, result, "Failed to get xrCreateHandTrackerEXT function!")) {
+		return result;
+	}
+	return XR_SUCCESS;
+}
+
+static XrResult
+_check_extension_support(struct ext_t* ext)
+{
+	XrResult result;
+
+	// xrEnumerate*() functions are usually called once with CapacityInput = 0.
+	// The function will write the required amount into CountOutput. We then have
+	// to allocate an array to hold CountOutput elements and call the function
+	// with CountOutput as CapacityInput.
+	uint32_t ext_count = 0;
+	result = xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL);
+
+	/* TODO: instance null will not be able to convert XrResult to string */
+	if (!xr_check(NULL, result, "Failed to enumerate number of extension properties"))
+		return result;
+
+
+	XrExtensionProperties ext_props[ext_count];
+	for (uint16_t i = 0; i < ext_count; i++) {
+		// we usually have to fill in the type (for validation) and set
+		// next to NULL (or a pointer to an extension specific struct)
+		ext_props[i].type = XR_TYPE_EXTENSION_PROPERTIES;
+		ext_props[i].next = NULL;
+	}
+
+	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, ext_props);
+	if (!xr_check(NULL, result, "Failed to enumerate extension properties"))
+		return result;
+
+	printf("Runtime supports %d extensions\n", ext_count);
+	for (uint32_t i = 0; i < ext_count; i++) {
+		printf("\t%s v%d\n", ext_props[i].extensionName, ext_props[i].extensionVersion);
+	}
+
+
+	if (_extension_supported(ext_props, ext_count, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)) {
+		ext->opengl.supported = true;
+		ext->opengl.version =
+		    _extension_version(ext_props, ext_count, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+	} else {
+		// opengl required
+		return XR_ERROR_EXTENSION_NOT_PRESENT;
+	}
+
+	if (_extension_supported(ext_props, ext_count, XR_EXT_HAND_TRACKING_EXTENSION_NAME)) {
+		ext->hand_tracking.supported = true;
+		ext->hand_tracking.version =
+		    _extension_version(ext_props, ext_count, XR_EXT_HAND_TRACKING_EXTENSION_NAME);
+	}
+
+	return XR_SUCCESS;
+}
+
+static XrResult
+_init_extensions(XrInstance instance, struct ext_t* ext)
+{
+	XrResult result;
+
+	// opengl is required
+	result = _init_opengl_ext(instance, ext);
+	if (!xr_check(instance, result, "Failed to init OpenGL ext")) {
+		return XR_ERROR_EXTENSION_NOT_PRESENT;
+	}
+
+	// those may succeed or not
+	result = _init_hand_tracking_ext(instance, ext);
+
+	return XR_SUCCESS;
+}
 
 struct swapchain_t
 {
@@ -972,23 +1109,6 @@ get_action_data(XrInstance instance,
 	return true;
 }
 
-struct hand_tracking_t
-{
-	bool supported;
-	// whether the current VR system in use has hand tracking
-	bool system_supported;
-	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
-	XrHandTrackerEXT trackers[HAND_COUNT];
-
-	// out data
-	XrHandJointLocationEXT joints[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
-	XrHandJointLocationsEXT joint_locations[HAND_COUNT];
-
-	// optional
-	XrHandJointVelocitiesEXT joint_velocities[HAND_COUNT];
-	XrHandJointVelocityEXT joint_velocities_arr[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
-};
-
 struct quad_layer_t
 {
 	// quad layers are placed into world space, no need to render them per eye
@@ -1002,7 +1122,7 @@ create_hand_trackers(XrInstance instance, XrSession session, struct hand_trackin
 	XrResult result;
 
 	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
-	                               (PFN_xrVoidFunction*)&pfnLocateHandJointsEXT);
+	                               (PFN_xrVoidFunction*)&hand_tracking->pfnLocateHandJointsEXT);
 
 	XrHandEXT hands[HAND_COUNT] = {
 	    [HAND_LEFT_INDEX] = XR_HAND_LEFT_EXT, [HAND_RIGHT_INDEX] = XR_HAND_RIGHT_EXT};
@@ -1013,8 +1133,8 @@ create_hand_trackers(XrInstance instance, XrSession session, struct hand_trackin
 		    .next = NULL,
 		    .hand = hands[i],
 		    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
-		result =
-		    pfnCreateHandTrackerEXT(session, &hand_tracker_create_info, &hand_tracking->trackers[i]);
+		result = hand_tracking->pfnCreateHandTrackerEXT(session, &hand_tracker_create_info,
+		                                                &hand_tracking->trackers[i]);
 		if (!xr_check(instance, result, "Failed to create hand tracker %d", i)) {
 			return false;
 		}
@@ -1053,8 +1173,8 @@ get_hand_tracking(XrInstance instance,
 	    .type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT, .next = NULL, .baseSpace = space, .time = time};
 
 	XrResult result;
-	result = pfnLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
-	                                &hand_tracking->joint_locations[hand]);
+	result = hand_tracking->pfnLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
+	                                               &hand_tracking->joint_locations[hand]);
 	if (!xr_check(instance, result, "failed to locate hand joints!"))
 		return false;
 
@@ -1145,75 +1265,25 @@ main(int argc, char** argv)
 
 	XrPath hand_paths[HAND_COUNT];
 
-	// supporting depth layers is *optional* for runtimes
-	struct
-	{
-		bool supported;
-		XrCompositionLayerDepthInfoKHR* infos;
-	} depth;
-
-	struct hand_tracking_t hand_tracking = {0};
-
 	struct gl_renderer_t gl_rendering = {
 	    .near_z = 0.01f,
 	    .far_z = 100.0f,
 	};
 
+	struct ext_t ext = {0};
+
 	// reuse this variable for all our OpenXR return codes
 	XrResult result = XR_SUCCESS;
 
-	// xrEnumerate*() functions are usually called once with CapacityInput = 0.
-	// The function will write the required amount into CountOutput. We then have
-	// to allocate an array to hold CountOutput elements and call the function
-	// with CountOutput as CapacityInput.
-	uint32_t ext_count = 0;
-	result = xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL);
-
-	/* TODO: instance null will not be able to convert XrResult to string */
-	if (!xr_check(NULL, result, "Failed to enumerate number of extension properties"))
-		return 1;
-
-
-	XrExtensionProperties extension_props[ext_count];
-	for (uint16_t i = 0; i < ext_count; i++) {
-		// we usually have to fill in the type (for validation) and set
-		// next to NULL (or a pointer to an extension specific struct)
-		extension_props[i].type = XR_TYPE_EXTENSION_PROPERTIES;
-		extension_props[i].next = NULL;
-	}
-
-	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, extension_props);
-	if (!xr_check(NULL, result, "Failed to enumerate extension properties"))
-		return 1;
-
-	bool has_opengl_ext = false;
-
-	printf("Runtime supports %d extensions\n", ext_count);
-	for (uint32_t i = 0; i < ext_count; i++) {
-		printf("\t%s v%d\n", extension_props[i].extensionName, extension_props[i].extensionVersion);
-		if (strcmp(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, extension_props[i].extensionName) == 0) {
-			has_opengl_ext = true;
-		}
-		if (strcmp(XR_EXT_HAND_TRACKING_EXTENSION_NAME, extension_props[i].extensionName) == 0) {
-			hand_tracking.supported = true;
-		}
-		if (strcmp(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, extension_props[i].extensionName) ==
-		    0) {
-			depth.supported = true;
-		}
-	}
-
-	// A graphics extension like OpenGL is required to draw anything in VR
-	if (!has_opengl_ext) {
-		printf("Runtime does not support OpenGL extension!\n");
+	result = _check_extension_support(&ext);
+	if (!xr_check(instance, result, "Extensions check failed!")) {
 		return 1;
 	}
-
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
 	const char* enabled_exts[2] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
-	if (hand_tracking.supported) {
+	if (ext.hand_tracking.supported) {
 		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
 	}
 
@@ -1245,8 +1315,10 @@ main(int argc, char** argv)
 	if (!xr_check(NULL, result, "Failed to create XR instance."))
 		return 1;
 
-	if (!load_extension_function_pointers(instance))
+	result = _init_extensions(instance, &ext);
+	if (!xr_check(instance, result, "Failed to init extensions!")) {
 		return 1;
+	}
 
 	// Optionally get runtime name and version
 	print_instance_properties(instance);
@@ -1274,7 +1346,7 @@ main(int argc, char** argv)
 
 		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
 		                                        .next = NULL};
-		if (hand_tracking.supported) {
+		if (ext.hand_tracking.supported) {
 			system_props.next = &ht;
 		}
 
@@ -1282,7 +1354,7 @@ main(int argc, char** argv)
 		if (!xr_check(instance, result, "Failed to get System properties"))
 			return 1;
 
-		hand_tracking.system_supported = hand_tracking.supported && ht.supportsHandTracking;
+		ext.hand_tracking.system_supported = ext.hand_tracking.supported && ht.supportsHandTracking;
 
 		print_system_properties(&system_props);
 	}
@@ -1315,7 +1387,7 @@ main(int argc, char** argv)
 	                                               .next = NULL};
 
 	// this function pointer was loaded with xrGetInstanceProcAddr
-	result = pfnGetOpenGLGraphicsRequirementsKHR(instance, system_id, &opengl_reqs);
+	result = ext.opengl.pfnGetOpenGLGraphicsRequirementsKHR(instance, system_id, &opengl_reqs);
 	if (!xr_check(instance, result, "Failed to get OpenGL graphics requirements!"))
 		return 1;
 
@@ -1388,7 +1460,9 @@ main(int argc, char** argv)
 	int64_t depth_format = get_swapchain_format(instance, session, GL_DEPTH_COMPONENT16, false);
 	if (depth_format < 0) {
 		printf("Preferred depth format GL_DEPTH_COMPONENT16 not supported, disabling depth\n");
-		depth.supported = false;
+		ext.depth.supported = false;
+	} else {
+		ext.depth.supported = true;
 	}
 
 	XrSwapchainUsageFlags color_flags =
@@ -1397,7 +1471,7 @@ main(int argc, char** argv)
 	                                 view_count, color_format, viewconfig_views, color_flags))
 		return 1;
 
-	if (depth.supported) {
+	if (ext.depth.supported) {
 		XrSwapchainUsageFlags depth_flags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		if (!create_swapchain_from_views(instance, session, &vr_swapchains[SWAPCHAIN_DEPTH], view_count,
 		                                 depth_format, viewconfig_views, depth_flags)) {
@@ -1433,28 +1507,28 @@ main(int argc, char** argv)
 	};
 
 
-	if (depth.supported) {
-		depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(sizeof(XrCompositionLayerDepthInfoKHR) *
-		                                                      view_count);
+	if (ext.depth.supported) {
+		ext.depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
+		    sizeof(XrCompositionLayerDepthInfoKHR) * view_count);
 		for (uint32_t i = 0; i < view_count; i++) {
-			depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
-			depth.infos[i].next = NULL;
-			depth.infos[i].minDepth = 0.f;
-			depth.infos[i].maxDepth = 1.f;
-			depth.infos[i].nearZ = gl_rendering.near_z;
-			depth.infos[i].farZ = gl_rendering.far_z;
+			ext.depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
+			ext.depth.infos[i].next = NULL;
+			ext.depth.infos[i].minDepth = 0.f;
+			ext.depth.infos[i].maxDepth = 1.f;
+			ext.depth.infos[i].nearZ = gl_rendering.near_z;
+			ext.depth.infos[i].farZ = gl_rendering.far_z;
 
-			depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
+			ext.depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
 
-			depth.infos[i].subImage.imageArrayIndex = 0;
-			depth.infos[i].subImage.imageRect.offset.x = 0;
-			depth.infos[i].subImage.imageRect.offset.y = 0;
-			depth.infos[i].subImage.imageRect.extent.width =
+			ext.depth.infos[i].subImage.imageArrayIndex = 0;
+			ext.depth.infos[i].subImage.imageRect.offset.x = 0;
+			ext.depth.infos[i].subImage.imageRect.offset.y = 0;
+			ext.depth.infos[i].subImage.imageRect.extent.width =
 			    viewconfig_views[i].recommendedImageRectWidth;
-			depth.infos[i].subImage.imageRect.extent.height =
+			ext.depth.infos[i].subImage.imageRect.extent.height =
 			    viewconfig_views[i].recommendedImageRectHeight;
 
-			projection_views[i].next = &depth.infos[i];
+			projection_views[i].next = &ext.depth.infos[i];
 		};
 	}
 
@@ -1539,8 +1613,8 @@ main(int argc, char** argv)
 		return 1;
 
 
-	if (hand_tracking.system_supported) {
-		if (!create_hand_trackers(instance, session, &hand_tracking))
+	if (ext.hand_tracking.system_supported) {
+		if (!create_hand_trackers(instance, session, &ext.hand_tracking))
 			return 1;
 	}
 
@@ -1820,9 +1894,9 @@ main(int argc, char** argv)
 				       accelerate_action.states[i].float_.currentState);
 			}
 
-			if (hand_tracking.system_supported) {
+			if (ext.hand_tracking.system_supported) {
 				get_hand_tracking(instance, play_space, frameState.predictedDisplayTime,
-				                  query_joint_velocities, &hand_tracking, i);
+				                  query_joint_velocities, &ext.hand_tracking, i);
 			}
 		};
 
@@ -1853,12 +1927,13 @@ main(int argc, char** argv)
 				break;
 
 			uint32_t depth_index = 0;
-			if (depth.supported) {
+			if (ext.depth.supported) {
 				if (!acquire_swapchain(instance, &vr_swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
 					break;
 			}
 
-			GLuint depth_image = depth.supported ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image : 0;
+			GLuint depth_image =
+			    ext.depth.supported ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image : 0;
 			GLuint projection_image =
 			    vr_swapchains[SWAPCHAIN_PROJECTION].images[i][projection_index].image;
 
@@ -1870,15 +1945,15 @@ main(int argc, char** argv)
 			               graphics_binding_gl.glxContext);
 
 			render_frame(w, h, &gl_rendering, projection_index, frameState.predictedDisplayTime, i,
-			             hand_pose_action.pose_locations, &hand_tracking, projection_matrix, view_matrix,
-			             projection_image, depth.supported, depth_image);
+			             hand_pose_action.pose_locations, &ext.hand_tracking, projection_matrix,
+			             view_matrix, projection_image, ext.depth.supported, depth_image);
 
 			result =
 			    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i], &release_info);
 			if (!xr_check(instance, result, "failed to release swapchain image!"))
 				break;
 
-			if (depth.supported) {
+			if (ext.depth.supported) {
 				result =
 				    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i], &release_info);
 				if (!xr_check(instance, result, "failed to release swapchain image!"))
@@ -1961,7 +2036,7 @@ main(int argc, char** argv)
 	// --- Clean up after render loop quits
 	for (uint32_t i = 0; i < view_count; i++) {
 		free(vr_swapchains[SWAPCHAIN_PROJECTION].images[i]);
-		if (depth.supported) {
+		if (ext.depth.supported) {
 			free(vr_swapchains[SWAPCHAIN_DEPTH].images[i]);
 		}
 
@@ -1979,7 +2054,7 @@ main(int argc, char** argv)
 	destroy_swapchain(&vr_swapchains[SWAPCHAIN_DEPTH]);
 	free(gl_rendering.framebuffers);
 
-	free(depth.infos);
+	free(ext.depth.infos);
 
 	printf("Cleaned up!\n");
 }
