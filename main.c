@@ -1623,6 +1623,15 @@ main(int argc, char** argv)
 			for (uint32_t i = 0; i < refresh_rate_count; i++) {
 				printf("\t%f Hz\n", refresh_rates[i]);
 			}
+
+			// refresh rates are ordered lowest to highest
+			printf("Requesting refresh rate %f\n", refresh_rates[refresh_rate_count - 1]);
+			result = ext.refresh_rate.pfnxrRequestDisplayRefreshRateFB(
+			    session, refresh_rates[refresh_rate_count - 1]);
+			if (!xr_check(instance, result, "failed to request refresh rate %f",
+			              refresh_rates[refresh_rate_count - 1]))
+				return 1;
+
 			free(refresh_rates);
 		}
 
