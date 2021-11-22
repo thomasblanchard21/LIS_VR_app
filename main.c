@@ -1602,6 +1602,39 @@ main(int argc, char** argv)
 	}
 
 
+	// get info from fb_refresh_rate
+	if (ext.refresh_rate.supported) {
+		uint32_t refresh_rate_count;
+		result =
+		    ext.refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB(session, 0, &refresh_rate_count, NULL);
+		if (!xr_check(instance, result, "failed to enumerate refresh rate count"))
+			return 1;
+
+		if (refresh_rate_count > 0) {
+			float* refresh_rates = malloc(sizeof(float) * refresh_rate_count);
+			result = ext.refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB(
+			    session, refresh_rate_count, &refresh_rate_count, refresh_rates);
+			if (!xr_check(instance, result, "failed to enumerate refresh rates")) {
+				free(refresh_rates);
+				return 1;
+			}
+
+			printf("Supported refresh rates:\n");
+			for (uint32_t i = 0; i < refresh_rate_count; i++) {
+				printf("\t%f Hz\n", refresh_rates[i]);
+			}
+			free(refresh_rates);
+		}
+
+		float refresh_rate = 0;
+		result = ext.refresh_rate.pfnxrGetDisplayRefreshRateFB(session, &refresh_rate);
+		if (!xr_check(instance, result, "failed to get refresh rate"))
+			return 1;
+
+		printf("Current refresh rate: %f Hz\n", refresh_rate);
+	}
+
+
 	// --- Set up input (actions)
 
 	xrStringToPath(instance, "/user/hand/left", &hand_paths[HAND_LEFT_INDEX]);
