@@ -32,7 +32,7 @@ else()
 endif()
 
 target_link_libraries(openxr-playground PRIVATE Xrandr ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} m)
-target_include_directories(openxr-playground PRIVATE ${SDL2_INCLUDE_DIR})
+target_include_directories(openxr-playground PRIVATE ${SDL2_INCLUDE_DIRS})
 
 if(MSVC)
   target_compile_options(openxr-playground PRIVATE /W4 /WX)
