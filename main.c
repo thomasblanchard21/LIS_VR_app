@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <getopt.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -34,6 +35,8 @@
 #error Only Linux/XLib supported for now
 #endif
 
+#include <string.h>
+
 /*
 This file contains expansion macros (X Macros) for OpenXR enumerations and structures.
 Example of how to use expansion macros to make an enum-to-string function:
@@ -50,10 +53,36 @@ Example of how to use expansion macros to make an enum-to-string function:
 		}                                                                                              \
 	}
 
-XR_ENUM_STR(XrResult)
-XR_ENUM_STR(XrFormFactor)
-XR_ENUM_STR(XrReferenceSpaceType)
-XR_ENUM_STR(XrViewConfigurationType)
+#define XR_STR_IF_ENUM(name, val)                                                                  \
+	if (strcmp(#name, e) == 0)                                                                       \
+		return val;
+#define XR_STR_ENUM(enumType)                                                                      \
+	uint64_t XrEnum_##enumType(const char* e)                                                        \
+	{                                                                                                \
+		XR_LIST_ENUM_##enumType(XR_STR_IF_ENUM) return 0x7FFFFFFF;                                     \
+	}
+
+#define XR_PRINT_ENUM(name, val)                                                                   \
+	if (val != 0x7FFFFFFF)                                                                           \
+		printf("\t\t%s\n", #name);
+#define XR_ENUM_PRINT_VALS(enumType)                                                               \
+	void XrPrintEnum_##enumType()                                                                    \
+	{                                                                                                \
+		XR_LIST_ENUM_##enumType(XR_PRINT_ENUM)                                                         \
+	}
+
+// instead of invoking each of the macros for every type, make a meta macro
+#define XR_MACROS(enumType)                                                                        \
+	XR_ENUM_STR(enumType)                                                                            \
+	XR_STR_ENUM(enumType)                                                                            \
+	XR_ENUM_PRINT_VALS(enumType)
+
+XR_MACROS(XrResult)
+XR_MACROS(XrFormFactor)
+XR_MACROS(XrReferenceSpaceType)
+XR_MACROS(XrViewConfigurationType)
+XR_MACROS(XrEnvironmentBlendMode)
+
 
 typedef const char* (*XrStr_fn)(long value);
 
@@ -70,7 +99,6 @@ static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0
 #define HAND_LEFT_INDEX 0
 #define HAND_RIGHT_INDEX 1
 #define HAND_COUNT 2
-
 
 
 // =============================================================================
@@ -357,6 +385,11 @@ struct gl_renderer_t
 		GLuint texture;
 		GLuint fbo;
 	} quad;
+
+	int modelLoc;
+	int colorLoc;
+	int viewLoc;
+	int projLoc;
 };
 
 struct hand_tracking_t;
@@ -374,8 +407,10 @@ init_sdl_window(Display** xDisplay,
 int
 init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* gl_renderer);
 
+struct ApplicationState;
 void
-render_frame(int w,
+render_frame(struct ApplicationState* app,
+             int w,
              int h,
              struct gl_renderer_t* gl_renderer,
              uint32_t projection_index,
@@ -383,15 +418,14 @@ render_frame(int w,
              int view_index,
              XrSpaceLocation* hand_locations,
              struct hand_tracking_t* hand_tracking,
-             XrMatrix4x4f projectionmatrix,
-             XrMatrix4x4f viewmatrix,
+             XrView* view,
              GLuint image,
              bool depth_supported,
              GLuint depthbuffer);
 
 struct quad_layer_t;
 void
-render_quad(struct gl_renderer_t* gl_rendering,
+render_quad(struct gl_renderer_t* gl_renderer,
             struct quad_layer_t* quad,
             uint32_t swapchain_index,
             XrTime predictedDisplayTime);
@@ -606,18 +640,25 @@ get_swapchain_format(XrInstance instance,
 	return chosen_format;
 }
 
-struct opengl_t
+struct base_extension_t
 {
 	bool supported;
 	uint32_t version;
+
+	char* ext_name_string;
+};
+
+struct opengl_t
+{
+	struct base_extension_t base;
+
 	// functions belonging to extensions must be loaded with xrGetInstanceProcAddr before use
-	PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR;
+	PFN_xrGetOpenGLGraphicsRequirementsKHR xrGetOpenGLGraphicsRequirementsKHR;
 };
 
 struct hand_tracking_t
 {
-	bool supported;
-	uint32_t version;
+	struct base_extension_t base;
 
 	// whether the current VR system in use has hand tracking
 	bool system_supported;
@@ -631,134 +672,181 @@ struct hand_tracking_t
 	XrHandJointVelocitiesEXT joint_velocities[HAND_COUNT];
 	XrHandJointVelocityEXT joint_velocities_arr[HAND_COUNT][XR_HAND_JOINT_COUNT_EXT];
 
-	PFN_xrLocateHandJointsEXT pfnLocateHandJointsEXT;
-	PFN_xrCreateHandTrackerEXT pfnCreateHandTrackerEXT;
+	PFN_xrLocateHandJointsEXT xrLocateHandJointsEXT;
+	PFN_xrCreateHandTrackerEXT xrCreateHandTrackerEXT;
 };
 
 struct depth_t
 {
-	bool supported;
+	struct base_extension_t base;
+
 	XrCompositionLayerDepthInfoKHR* infos;
 };
 
 
 struct refresh_rate_t
 {
-	bool supported;
-	uint32_t version;
+	struct base_extension_t base;
 
-	PFN_xrEnumerateDisplayRefreshRatesFB pfnxrEnumerateDisplayRefreshRatesFB;
-	PFN_xrGetDisplayRefreshRateFB pfnxrGetDisplayRefreshRateFB;
-	PFN_xrRequestDisplayRefreshRateFB pfnxrRequestDisplayRefreshRateFB;
+	PFN_xrEnumerateDisplayRefreshRatesFB xrEnumerateDisplayRefreshRatesFB;
+	PFN_xrGetDisplayRefreshRateFB xrGetDisplayRefreshRateFB;
+	PFN_xrRequestDisplayRefreshRateFB xrRequestDisplayRefreshRateFB;
 };
 
 struct ext_t
 {
 	struct opengl_t opengl;
+	struct depth_t depth;
+
 	struct hand_tracking_t hand_tracking;
 	struct refresh_rate_t refresh_rate;
+};
 
-	// technically not extensions, but can be supported or not
-	struct depth_t depth;
+struct OpenXRState
+{
+	XrFormFactor form_factor;
+	XrViewConfigurationType view_type;
+	XrReferenceSpaceType play_space_type;
+
+	XrInstance instance;
+	XrSession session;
+	XrSystemId system_id;
+	XrSessionState state;
+
+	XrEnvironmentBlendMode blend_mode;
+	bool blend_mode_explicitly_set;
+
+	XrSpace play_space;
+
+	// Each physical Display/Eye is described by a view
+	uint32_t view_count;
+	XrViewConfigurationView* viewconfig_views;
+	XrCompositionLayerProjectionView* projection_views;
+	XrView* views;
+
+	XrViewState view_state;
+};
+
+struct action_t
+{
+	XrAction action;
+	XrActionType action_type;
+	union {
+		XrActionStateFloat float_;
+		XrActionStateBoolean boolean_;
+		XrActionStatePose pose_;
+		XrActionStateVector2f vec2f_;
+	} states[HAND_COUNT];
+	XrSpace pose_spaces[HAND_COUNT];
+	XrSpaceLocation pose_locations[HAND_COUNT];
+	XrSpaceVelocity pose_velocities[HAND_COUNT];
+};
+
+struct ApplicationState
+{
+	struct OpenXRState oxr;
+
+	// use optional XrSpaceVelocity in xrLocateSpace for controllers and visualize linear velocity
+	bool query_hand_velocities;
+
+	// use optional XrSpaceVelocity in xrLocateHandJointsEXT and visualize linear velocity
+	bool query_joint_velocities;
+
+	struct
+	{
+		bool enabled;
+		// cube moves in `velocity` direction until it hits `center_pos +- `bouncing_lengths, then
+		// reverse `velocity
+		XrVector3f center_pos;       // m
+		XrVector3f current_pos;      // m
+		XrTime pos_ts;               // ns
+		XrVector3f velocity;         // m/s
+		XrVector3f bouncing_lengths; // m
+	} cube;
+
+	// Grabbing objects is not actually implemented in this demo, it only gives some  haptic feebdack.
+	struct action_t grab_action;
+
+	// A 1D action that is fed by one axis of a 2D input (y axis of thumbstick).
+	struct action_t accelerate_action;
+
+	struct action_t hand_pose_action;
+	struct action_t aim_action;
+
+	struct action_t haptic_action;
+
+	XrSpace ref_local_space;
+	XrSpace ref_local_space_y1;
+
+	XrSpace ref_stage_space;
+	XrSpace ref_stage_space_y1;
+
+	XrSpace ref_view_space;
+	XrSpace ref_view_space_z1;
+
+	struct gl_renderer_t gl_renderer;
 };
 
 
+#define LOAD_OR_RETURN(NAME, LOCATION)                                                             \
+	{                                                                                                \
+		XrResult result = xrGetInstanceProcAddr(instance, #NAME, (PFN_xrVoidFunction*)&LOCATION.NAME); \
+		if (!xr_check(instance, result, "Failed to get %s function!", #NAME))                          \
+			return result;                                                                               \
+	}
+
 static bool
-_extension_supported(XrExtensionProperties* extension_props, uint32_t ext_count, char* ext_name)
+_check_extension_support(struct base_extension_t* e,
+                         XrExtensionProperties* extension_props,
+                         uint32_t ext_count)
 {
 	for (uint32_t i = 0; i < ext_count; i++) {
-		if (strcmp(ext_name, extension_props[i].extensionName) == 0) {
+		if (strcmp(e->ext_name_string, extension_props[i].extensionName) == 0) {
+			e->supported = true;
+			e->version = extension_props[i].extensionVersion;
 			return true;
 		}
 	}
 	return false;
 }
 
-static uint32_t
-_extension_version(XrExtensionProperties* extension_props, uint32_t ext_count, char* ext_name)
-{
-	for (uint32_t i = 0; i < ext_count; i++) {
-		if (strcmp(ext_name, extension_props[i].extensionName) == 0) {
-			return extension_props[i].extensionVersion;
-		}
-	}
-	return 0;
-}
-
 static XrResult
 _init_opengl_ext(XrInstance instance, struct ext_t* ext)
 {
-	XrResult result =
-	    xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
-	                          (PFN_xrVoidFunction*)&ext->opengl.pfnGetOpenGLGraphicsRequirementsKHR);
-	if (!xr_check(instance, result, "Failed to get xrGetOpenGLGraphicsRequirementsKHR function!"))
-		return result;
+	LOAD_OR_RETURN(xrGetOpenGLGraphicsRequirementsKHR, ext->opengl)
 	return XR_SUCCESS;
 }
 
 static XrResult
 _init_hand_tracking_ext(XrInstance instance, struct ext_t* ext)
 {
-	if (!ext->hand_tracking.supported) {
+	if (!ext->hand_tracking.base.supported) {
 		return XR_SUCCESS;
 	}
 
-	XrResult result;
-	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
-	                               (PFN_xrVoidFunction*)&ext->hand_tracking.pfnLocateHandJointsEXT);
-	if (!xr_check(instance, result, "Failed to get xrLocateHandJointsEXT function!")) {
-		return result;
-	}
-
-	result = xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT",
-	                               (PFN_xrVoidFunction*)&ext->hand_tracking.pfnCreateHandTrackerEXT);
-	if (!xr_check(instance, result, "Failed to get xrCreateHandTrackerEXT function!")) {
-		return result;
-	}
+	LOAD_OR_RETURN(xrLocateHandJointsEXT, ext->hand_tracking)
+	LOAD_OR_RETURN(xrCreateHandTrackerEXT, ext->hand_tracking)
 	return XR_SUCCESS;
 }
 
 static XrResult
 _init_refresh_rate_ext(XrInstance instance, struct ext_t* ext)
 {
-	if (!ext->refresh_rate.supported) {
+	if (!ext->refresh_rate.base.supported) {
 		return XR_SUCCESS;
 	}
 
-	XrResult result;
-	result = xrGetInstanceProcAddr(
-	    instance, "xrEnumerateDisplayRefreshRatesFB",
-	    (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB);
-	if (!xr_check(instance, result, "Failed to get xrEnumerateDisplayRefreshRatesFB function!")) {
-		return result;
-	}
-
-	result =
-	    xrGetInstanceProcAddr(instance, "xrGetDisplayRefreshRateFB",
-	                          (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrGetDisplayRefreshRateFB);
-	if (!xr_check(instance, result, "Failed to get xrGetDisplayRefreshRateFB function!")) {
-		return result;
-	}
-
-	result = xrGetInstanceProcAddr(
-	    instance, "xrRequestDisplayRefreshRateFB",
-	    (PFN_xrVoidFunction*)&ext->refresh_rate.pfnxrRequestDisplayRefreshRateFB);
-	if (!xr_check(instance, result, "Failed to get xrRequestDisplayRefreshRateFB function!")) {
-		return result;
-	}
-
+	LOAD_OR_RETURN(xrEnumerateDisplayRefreshRatesFB, ext->refresh_rate)
+	LOAD_OR_RETURN(xrGetDisplayRefreshRateFB, ext->refresh_rate)
+	LOAD_OR_RETURN(xrRequestDisplayRefreshRateFB, ext->refresh_rate)
 	return XR_SUCCESS;
 }
 
 static XrResult
-_check_extension_support(struct ext_t* ext)
+_check_extensions(struct ApplicationState* app, struct ext_t* ext)
 {
 	XrResult result;
 
-	// xrEnumerate*() functions are usually called once with CapacityInput = 0.
-	// The function will write the required amount into CountOutput. We then have
-	// to allocate an array to hold CountOutput elements and call the function
-	// with CountOutput as CapacityInput.
 	uint32_t ext_count = 0;
 	result = xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL);
 
@@ -767,7 +855,7 @@ _check_extension_support(struct ext_t* ext)
 		return result;
 
 
-	XrExtensionProperties ext_props[ext_count];
+	XrExtensionProperties* ext_props = malloc(sizeof(XrExtensionProperties) * ext_count);
 	for (uint16_t i = 0; i < ext_count; i++) {
 		// we usually have to fill in the type (for validation) and set
 		// next to NULL (or a pointer to an extension specific struct)
@@ -776,36 +864,21 @@ _check_extension_support(struct ext_t* ext)
 	}
 
 	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, ext_props);
-	if (!xr_check(NULL, result, "Failed to enumerate extension properties"))
+	if (!xr_check(NULL, result, "Failed to enumerate extension properties")) {
+		free(ext_props);
 		return result;
+	}
 
 	printf("Runtime supports %d extensions\n", ext_count);
 	for (uint32_t i = 0; i < ext_count; i++) {
 		printf("\t%s v%d\n", ext_props[i].extensionName, ext_props[i].extensionVersion);
 	}
 
+	_check_extension_support(&ext->opengl.base, ext_props, ext_count);
+	_check_extension_support(&ext->hand_tracking.base, ext_props, ext_count);
+	_check_extension_support(&ext->refresh_rate.base, ext_props, ext_count);
 
-	if (_extension_supported(ext_props, ext_count, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)) {
-		ext->opengl.supported = true;
-		ext->opengl.version =
-		    _extension_version(ext_props, ext_count, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
-	} else {
-		// opengl required
-		return XR_ERROR_EXTENSION_NOT_PRESENT;
-	}
-
-	if (_extension_supported(ext_props, ext_count, XR_EXT_HAND_TRACKING_EXTENSION_NAME)) {
-		ext->hand_tracking.supported = true;
-		ext->hand_tracking.version =
-		    _extension_version(ext_props, ext_count, XR_EXT_HAND_TRACKING_EXTENSION_NAME);
-	}
-
-	if (_extension_supported(ext_props, ext_count, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME)) {
-		ext->refresh_rate.supported = true;
-		ext->refresh_rate.version =
-		    _extension_version(ext_props, ext_count, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
-	}
-
+	free(ext_props);
 	return XR_SUCCESS;
 }
 
@@ -814,7 +887,6 @@ _init_extensions(XrInstance instance, struct ext_t* ext)
 {
 	XrResult result;
 
-	// opengl is required
 	result = _init_opengl_ext(instance, ext);
 	if (!xr_check(instance, result, "Failed to init OpenGL ext")) {
 		return result;
@@ -1063,21 +1135,6 @@ suggest_actions(XrInstance instance, char* profile, struct Binding* b, int bindi
 	return true;
 }
 
-struct action_t
-{
-	XrAction action;
-	XrActionType action_type;
-	union {
-		XrActionStateFloat float_;
-		XrActionStateBoolean boolean_;
-		XrActionStatePose pose_;
-		XrActionStateVector2f vec2f_;
-	} states[HAND_COUNT];
-	XrSpace pose_spaces[HAND_COUNT];
-	XrSpaceLocation pose_locations[HAND_COUNT];
-	XrSpaceVelocity pose_velocities[HAND_COUNT];
-};
-
 bool
 create_action_space(XrInstance instance,
                     XrSession session,
@@ -1183,7 +1240,7 @@ create_hand_trackers(XrInstance instance, XrSession session, struct hand_trackin
 	XrResult result;
 
 	result = xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
-	                               (PFN_xrVoidFunction*)&hand_tracking->pfnLocateHandJointsEXT);
+	                               (PFN_xrVoidFunction*)&hand_tracking->xrLocateHandJointsEXT);
 
 	XrHandEXT hands[HAND_COUNT] = {
 	    [HAND_LEFT_INDEX] = XR_HAND_LEFT_EXT, [HAND_RIGHT_INDEX] = XR_HAND_RIGHT_EXT};
@@ -1194,8 +1251,8 @@ create_hand_trackers(XrInstance instance, XrSession session, struct hand_trackin
 		    .next = NULL,
 		    .hand = hands[i],
 		    .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT};
-		result = hand_tracking->pfnCreateHandTrackerEXT(session, &hand_tracker_create_info,
-		                                                &hand_tracking->trackers[i]);
+		result = hand_tracking->xrCreateHandTrackerEXT(session, &hand_tracker_create_info,
+		                                               &hand_tracking->trackers[i]);
 		if (!xr_check(instance, result, "Failed to create hand tracker %d", i)) {
 			return false;
 		}
@@ -1234,45 +1291,106 @@ get_hand_tracking(XrInstance instance,
 	    .type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT, .next = NULL, .baseSpace = space, .time = time};
 
 	XrResult result;
-	result = hand_tracking->pfnLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
-	                                               &hand_tracking->joint_locations[hand]);
+	result = hand_tracking->xrLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
+	                                              &hand_tracking->joint_locations[hand]);
 	if (!xr_check(instance, result, "failed to locate hand joints!"))
 		return false;
 
 	return true;
 }
 
-
-static char*
-get_arg(int argc, char** argv, char* arg_name)
+static struct option long_options[] = {{"help", no_argument, 0, 'h'},
+                                       {"velocities", no_argument, 0, 'v'},
+                                       {"jointvelocities", no_argument, 0, 'j'},
+                                       {"formfactor", required_argument, 0, 'f'},
+                                       {"blendmode", required_argument, 0, 'b'},
+                                       {"space", required_argument, 0, 's'},
+                                       {"movingcube", required_argument, 0, 'c'},
+                                       {0, 0, 0, 0}};
+void
+parse_opts(int argc, char** argv, struct ApplicationState* app)
 {
-	for (int i = 0; i < argc; i++) {
-		if (strcmp(argv[i], arg_name) == 0 && i + 1 < argc) {
-			return argv[i + 1];
-		}
-	}
-	return false;
-}
+	while (1) {
+		int c;
+		int option_index = 0;
+		c = getopt_long(argc, argv, "jhf:b:s:c:p", long_options, &option_index);
+		if (c == -1)
+			break;
 
-static void
-arg_to_enum(int argc, char** argv, char* arg_name, XrStr_fn fn, uint64_t* val_ptr)
-{
-	char* arg_value = get_arg(argc, argv, arg_name);
-	if (!arg_value) {
-		return;
-	}
-	printf("Parsing arg %s: %s\n", arg_name, arg_value);
+		switch (c) {
+		case 0:
+			/* If this option set a flag, do nothing else now. */
+			if (long_options[option_index].flag != 0)
+				break;
+			printf("option %s", long_options[option_index].name);
+			if (optarg)
+				printf(" with arg %s", optarg);
+			printf("\n");
+			break;
 
-	for (long i = 0; i < 0x7FFFFFFF; i++) {
-		// hack: not all enums start with 0
-		if (strcmp(fn(i), "Unknown") == 0 && i > 1) {
-			printf("no value found for arg %s %s\n", arg_name, arg_value);
-			return;
-		}
-		if (strcmp(fn(i), arg_value) == 0) {
-			*val_ptr = i;
-			printf("parsed arg %s %s (%lu)\n", arg_name, arg_value, i);
-			return;
+		case 'h':
+		case '?':
+			printf("%s:\n", argv[0]);
+			printf("\t-v|--velocities\n");
+			printf("\t-j|--jointvelocities\n");
+			printf("\t-f|--formfactor <XrFormFactor>\n");
+			XrPrintEnum_XrFormFactor();
+			printf("\t-b|--blendmode <XrEnvironmentBlendMode>\n");
+			XrPrintEnum_XrEnvironmentBlendMode();
+			printf("\t-s|--space <XrReferenceSpaceType>\n");
+			XrPrintEnum_XrReferenceSpaceType();
+			printf("\t-c|--bouncingcube <direction>\n");
+			printf("\t\thorizontal\n");
+			printf("\t\tdiagonal\n");
+			printf("\t\tvertical\n");
+			exit(0);
+
+		case 'b':
+			app->oxr.blend_mode = XrEnum_XrEnvironmentBlendMode(optarg);
+			app->oxr.blend_mode_explicitly_set = true;
+			printf("ARG: Blend Mode %s -> %d\n", optarg, app->oxr.blend_mode);
+			break;
+
+		case 'f':
+			app->oxr.form_factor = XrEnum_XrFormFactor(optarg);
+			printf("ARG: Form Factor %s -> %d\n", optarg, app->oxr.form_factor);
+			break;
+
+		case 's':
+			app->oxr.play_space_type = XrEnum_XrReferenceSpaceType(optarg);
+			printf("ARG: Reference Space %s -> %d\n", optarg, app->oxr.play_space_type);
+			break;
+
+		case 'c':
+			app->cube.enabled = true;
+			app->cube.center_pos = (XrVector3f){.x = 0, .y = 0, .z = -1};
+			app->cube.current_pos = app->cube.center_pos;
+			app->cube.bouncing_lengths = (XrVector3f){.x = 0.75f, .y = 0.75f, .z = 0.75f};
+
+			float velocity = 0.5;
+			if (strcmp(optarg, "horizontal") == 0) {
+				app->cube.velocity = (XrVector3f){.x = velocity, .y = 0, .z = 0};
+			} else if (strcmp(optarg, "diagonal") == 0) {
+				app->cube.velocity = (XrVector3f){.x = velocity * sqrt(2), .y = velocity * sqrt(2), .z = 0};
+			} else if (strcmp(optarg, "vertical") == 0) {
+				app->cube.velocity = (XrVector3f){.x = 0, .y = velocity, .z = 0};
+			}
+			XrEnum_XrReferenceSpaceType(optarg);
+			printf("ARG: Enable moving cube %s -> %f, %f, %f\n", optarg, app->cube.velocity.x,
+			       app->cube.velocity.y, app->cube.velocity.z);
+			break;
+
+		case 'j':
+			printf("ARG: Enabling joint velocities\n");
+			app->query_joint_velocities = true;
+			break;
+
+		case 'v':
+			printf("ARG: Enabling hand velocities\n");
+			app->query_hand_velocities = true;
+			break;
+
+		default: abort();
 		}
 	}
 }
@@ -1280,42 +1398,35 @@ arg_to_enum(int argc, char** argv, char* arg_name, XrStr_fn fn, uint64_t* val_pt
 int
 main(int argc, char** argv)
 {
-	XrFormFactor form_factor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-	XrViewConfigurationType view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-	XrReferenceSpaceType play_space_type = XR_REFERENCE_SPACE_TYPE_LOCAL;
+	struct ApplicationState app = {
+	    .oxr =
+	        {
+	            .form_factor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
+	            .view_type = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+	            .play_space_type = XR_REFERENCE_SPACE_TYPE_STAGE,
 
-	// use optional XrSpaceVelocity in xrLocateSpace for controllers and visualize linear velocity
-	bool query_hand_velocities = true;
+	            .instance = XR_NULL_HANDLE,
+	            .session = XR_NULL_HANDLE,
+	            .system_id = XR_NULL_SYSTEM_ID,
+	            .state = XR_SESSION_STATE_UNKNOWN,
+	            .play_space = XR_NULL_HANDLE,
 
-	// use optional XrSpaceVelocity in xrLocateHandJointsEXT and visualize linear velocity
-	bool query_joint_velocities = false;
+	            .view_count = 0,
+	            .viewconfig_views = NULL,
+	            .projection_views = NULL,
+	            .views = NULL,
+	        },
+	    .gl_renderer =
+	        {
+	            .near_z = 0.01f,
+	            .far_z = 100.0f,
+	        },
+	    .query_joint_velocities = false,
+	    .query_hand_velocities = false,
 
-	arg_to_enum(argc, argv, "--form_factor", (XrStr_fn)XrStr_XrFormFactor, (uint64_t*)&form_factor);
-	arg_to_enum(argc, argv, "--view_type", (XrStr_fn)XrStr_XrViewConfigurationType,
-	            (uint64_t*)&view_type);
-	arg_to_enum(argc, argv, "--play_space_type", (XrStr_fn)XrStr_XrReferenceSpaceType,
-	            (uint64_t*)&play_space_type);
+	};
 
-	for (int i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "--joint_velocities") == 0) {
-			query_joint_velocities = true;
-		}
-	}
-
-	// every OpenXR app that displays something needs at least an instance and a session
-	XrInstance instance = XR_NULL_HANDLE;
-	XrSession session = XR_NULL_HANDLE;
-	XrSystemId system_id = XR_NULL_SYSTEM_ID;
-	XrSessionState state = XR_SESSION_STATE_UNKNOWN;
-
-	// Play space is usually local (head is origin, seated) or stage (room scale)
-	XrSpace play_space = XR_NULL_HANDLE;
-
-	// Each physical Display/Eye is described by a view
-	uint32_t view_count = 0;
-	XrViewConfigurationView* viewconfig_views = NULL;
-	XrCompositionLayerProjectionView* projection_views = NULL;
-	XrView* views = NULL;
+	parse_opts(argc, argv, &app);
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
 	XrGraphicsBindingOpenGLXlibKHR graphics_binding_gl = {0};
@@ -1326,34 +1437,41 @@ main(int argc, char** argv)
 
 	XrPath hand_paths[HAND_COUNT];
 
-	struct gl_renderer_t gl_rendering = {
-	    .near_z = 0.01f,
-	    .far_z = 100.0f,
+	// have to define the names somewhere
+	struct ext_t ext = {
+	    .opengl.base.ext_name_string = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
+	    .depth.base.ext_name_string = XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+	    .hand_tracking.base.ext_name_string = XR_EXT_HAND_TRACKING_EXTENSION_NAME,
+	    .refresh_rate.base.ext_name_string = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME,
 	};
-
-	struct ext_t ext = {0};
 
 	// reuse this variable for all our OpenXR return codes
 	XrResult result = XR_SUCCESS;
 
-	result = _check_extension_support(&ext);
-	if (!xr_check(instance, result, "Extensions check failed!")) {
+
+	result = _check_extensions(&app, &ext);
+	if (!xr_check(app.oxr.instance, result, "Extensions check failed!")) {
 		return 1;
 	}
+	if (!ext.opengl.base.supported) {
+		printf("%s is required\n", ext.opengl.base.ext_name_string);
+		return 1;
+	};
+
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
-	const char* enabled_exts[3] = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
-	printf("enabling extension %s\n", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+	const char* enabled_exts[6] = {ext.opengl.base.ext_name_string};
+	printf("enabling extension %s\n", ext.opengl.base.ext_name_string);
 
-	if (ext.hand_tracking.supported) {
-		enabled_exts[enabled_ext_count++] = XR_EXT_HAND_TRACKING_EXTENSION_NAME;
-		printf("enabling extension %s\n", XR_EXT_HAND_TRACKING_EXTENSION_NAME);
+	if (ext.hand_tracking.base.supported) {
+		enabled_exts[enabled_ext_count++] = ext.hand_tracking.base.ext_name_string;
+		printf("enabling extension %s\n", ext.hand_tracking.base.ext_name_string);
 	}
 
-	if (ext.refresh_rate.supported) {
-		enabled_exts[enabled_ext_count++] = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME;
-		printf("enabling extension %s\n", XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
+	if (ext.refresh_rate.base.supported) {
+		enabled_exts[enabled_ext_count++] = ext.refresh_rate.base.ext_name_string;
+		printf("enabling extension %s\n", ext.refresh_rate.base.ext_name_string);
 	}
 
 	// same can be done for API layers, but API layers can also be enabled by env var
@@ -1380,27 +1498,27 @@ main(int argc, char** argv)
 	        XR_MAX_APPLICATION_NAME_SIZE);
 	strncpy(instance_create_info.applicationInfo.engineName, "Custom", XR_MAX_ENGINE_NAME_SIZE);
 
-	result = xrCreateInstance(&instance_create_info, &instance);
+	result = xrCreateInstance(&instance_create_info, &app.oxr.instance);
 	if (!xr_check(NULL, result, "Failed to create XR instance."))
 		return 1;
 
-	result = _init_extensions(instance, &ext);
-	if (!xr_check(instance, result, "Failed to init extensions!")) {
+	result = _init_extensions(app.oxr.instance, &ext);
+	if (!xr_check(app.oxr.instance, result, "Failed to init extensions!")) {
 		return 1;
 	}
 
 	// Optionally get runtime name and version
-	print_instance_properties(instance);
+	print_instance_properties(app.oxr.instance);
 
 	// --- Create XrSystem
 	XrSystemGetInfo system_get_info = {
-	    .type = XR_TYPE_SYSTEM_GET_INFO, .formFactor = form_factor, .next = NULL};
+	    .type = XR_TYPE_SYSTEM_GET_INFO, .formFactor = app.oxr.form_factor, .next = NULL};
 
-	result = xrGetSystem(instance, &system_get_info, &system_id);
-	if (!xr_check(instance, result, "Failed to get system for HMD form factor."))
+	result = xrGetSystem(app.oxr.instance, &system_get_info, &app.oxr.system_id);
+	if (!xr_check(app.oxr.instance, result, "Failed to get system for HMD form factor."))
 		return 1;
 
-	printf("Successfully got XrSystem with id %lu for HMD form factor\n", system_id);
+	printf("Successfully got XrSystem with id %lu for HMD form factor\n", app.oxr.system_id);
 
 
 	// checking system properties is generally  optional, but we are interested in hand tracking
@@ -1415,40 +1533,43 @@ main(int argc, char** argv)
 
 		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
 		                                        .next = NULL};
-		if (ext.hand_tracking.supported) {
+		if (ext.hand_tracking.base.supported) {
 			system_props.next = &ht;
 		}
 
-		result = xrGetSystemProperties(instance, system_id, &system_props);
-		if (!xr_check(instance, result, "Failed to get System properties"))
+		result = xrGetSystemProperties(app.oxr.instance, app.oxr.system_id, &system_props);
+		if (!xr_check(app.oxr.instance, result, "Failed to get System properties"))
 			return 1;
 
-		ext.hand_tracking.system_supported = ext.hand_tracking.supported && ht.supportsHandTracking;
+		ext.hand_tracking.system_supported =
+		    ext.hand_tracking.base.supported && ht.supportsHandTracking;
 
 		print_system_properties(&system_props);
 	}
 
-	print_supported_view_configs(instance, system_id);
+	print_supported_view_configs(app.oxr.instance, app.oxr.system_id);
 
 	// view_count usually depends on the form_factor / view_type.
 	// dynamically allocating all view related structs hopefully allows this app to scale easily to
 	// different view_counts.
 
-	result = xrEnumerateViewConfigurationViews(instance, system_id, view_type, 0, &view_count, NULL);
-	if (!xr_check(instance, result, "Failed to get view configuration view count!"))
+	result = xrEnumerateViewConfigurationViews(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
+	                                           0, &app.oxr.view_count, NULL);
+	if (!xr_check(app.oxr.instance, result, "Failed to get view configuration view count!"))
 		return 1;
 
-	viewconfig_views = malloc(sizeof(XrViewConfigurationView) * view_count);
-	for (uint32_t i = 0; i < view_count; i++) {
-		viewconfig_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
-		viewconfig_views[i].next = NULL;
+	app.oxr.viewconfig_views = malloc(sizeof(XrViewConfigurationView) * app.oxr.view_count);
+	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
+		app.oxr.viewconfig_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+		app.oxr.viewconfig_views[i].next = NULL;
 	}
 
-	result = xrEnumerateViewConfigurationViews(instance, system_id, view_type, view_count,
-	                                           &view_count, viewconfig_views);
-	if (!xr_check(instance, result, "Failed to enumerate view configuration views!"))
+	result = xrEnumerateViewConfigurationViews(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
+	                                           app.oxr.view_count, &app.oxr.view_count,
+	                                           app.oxr.viewconfig_views);
+	if (!xr_check(app.oxr.instance, result, "Failed to enumerate view configuration views!"))
 		return 1;
-	print_viewconfig_view_info(view_count, viewconfig_views);
+	print_viewconfig_view_info(app.oxr.view_count, app.oxr.viewconfig_views);
 
 
 	// OpenXR requires checking graphics requirements before creating a session.
@@ -1456,13 +1577,44 @@ main(int argc, char** argv)
 	                                               .next = NULL};
 
 	// this function pointer was loaded with xrGetInstanceProcAddr
-	result = ext.opengl.pfnGetOpenGLGraphicsRequirementsKHR(instance, system_id, &opengl_reqs);
-	if (!xr_check(instance, result, "Failed to get OpenGL graphics requirements!"))
+	result = ext.opengl.xrGetOpenGLGraphicsRequirementsKHR(app.oxr.instance, app.oxr.system_id,
+	                                                       &opengl_reqs);
+	if (!xr_check(app.oxr.instance, result, "Failed to get OpenGL graphics requirements!"))
 		return 1;
 
 	// On OpenGL we never fail this check because the version requirement is not useful.
 	// Other APIs may have more useful requirements.
 	check_opengl_version(&opengl_reqs);
+
+
+	uint32_t blend_mode_count = 0;
+	result = xrEnumerateEnvironmentBlendModes(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
+	                                          0, &blend_mode_count, NULL);
+	if (!xr_check(app.oxr.instance, result, "failed to enumerate blend mode count!"))
+		return 1;
+
+	XrEnvironmentBlendMode* blend_modes = malloc(sizeof(XrEnvironmentBlendMode) * blend_mode_count);
+	result = xrEnumerateEnvironmentBlendModes(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
+	                                          blend_mode_count, &blend_mode_count, blend_modes);
+	if (!xr_check(app.oxr.instance, result, "failed to enumerate blend modes!"))
+		return 1;
+
+	XrEnvironmentBlendMode mode_preference1 = XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
+	XrEnvironmentBlendMode mode_preference2 = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+
+	printf("Supported blend modes:\n");
+	for (uint32_t i = 0; i < blend_mode_count; i++) {
+		printf("\t%s\n", XrStr_XrEnvironmentBlendMode(blend_modes[i]));
+		if (!app.oxr.blend_mode_explicitly_set) {
+			if (blend_modes[i] == mode_preference1) {
+				app.oxr.blend_mode = blend_modes[i];
+			} else if (blend_modes[i] == mode_preference2 && !(app.oxr.blend_mode == mode_preference1)) {
+				app.oxr.blend_mode = blend_modes[i];
+			}
+		}
+	}
+	printf("Using blend mode: %s\n", XrStr_XrEnvironmentBlendMode(app.oxr.blend_mode));
+	free(blend_modes);
 
 
 	// --- Create session
@@ -1474,8 +1626,8 @@ main(int argc, char** argv)
 	if (!init_sdl_window(&graphics_binding_gl.xDisplay, &graphics_binding_gl.visualid,
 	                     &graphics_binding_gl.glxFBConfig, &graphics_binding_gl.glxDrawable,
 	                     &graphics_binding_gl.glxContext,
-	                     viewconfig_views[0].recommendedImageRectWidth,
-	                     viewconfig_views[0].recommendedImageRectHeight)) {
+	                     app.oxr.viewconfig_views[0].recommendedImageRectWidth,
+	                     app.oxr.viewconfig_views[0].recommendedImageRectHeight)) {
 		printf("GLX init failed!\n");
 		return 1;
 	}
@@ -1483,13 +1635,14 @@ main(int argc, char** argv)
 	printf("Using OpenGL version: %s\n", glGetString(GL_VERSION));
 	printf("Using OpenGL Renderer: %s\n", glGetString(GL_RENDERER));
 
-	state = XR_SESSION_STATE_UNKNOWN;
+	app.oxr.state = XR_SESSION_STATE_UNKNOWN;
 
-	XrSessionCreateInfo session_create_info = {
-	    .type = XR_TYPE_SESSION_CREATE_INFO, .next = &graphics_binding_gl, .systemId = system_id};
+	XrSessionCreateInfo session_create_info = {.type = XR_TYPE_SESSION_CREATE_INFO,
+	                                           .next = &graphics_binding_gl,
+	                                           .systemId = app.oxr.system_id};
 
-	result = xrCreateSession(instance, &session_create_info, &session);
-	if (!xr_check(instance, result, "Failed to create session"))
+	result = xrCreateSession(app.oxr.instance, &session_create_info, &app.oxr.session);
+	if (!xr_check(app.oxr.instance, result, "Failed to create session"))
 		return 1;
 
 	printf("Successfully created a session with OpenGL!\n");
@@ -1497,95 +1650,173 @@ main(int argc, char** argv)
 	// Many runtimes support at least STAGE and LOCAL but not all do.
 	// Sophisticated apps might check if the chosen one is supported and try another one if not.
 	// Here we will get an error from xrCreateReferenceSpace() and exit.
-	print_reference_spaces(instance, session);
+	print_reference_spaces(app.oxr.instance, app.oxr.session);
 	XrReferenceSpaceCreateInfo play_space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
 	                                                     .next = NULL,
-	                                                     .referenceSpaceType = play_space_type,
+	                                                     .referenceSpaceType =
+	                                                         app.oxr.play_space_type,
 	                                                     .poseInReferenceSpace = identity_pose};
 
-	result = xrCreateReferenceSpace(session, &play_space_create_info, &play_space);
-	if (!xr_check(instance, result, "Failed to create play space!"))
+	result = xrCreateReferenceSpace(app.oxr.session, &play_space_create_info, &app.oxr.play_space);
+	if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
 		return 1;
+
+
+	XrPosef y1 = {.position = {0, 1, 0}, .orientation = {0, 0, 0, 1}};
+
+	XrPosef z1 = {.position = {0, 0, -1}, .orientation = {0, 0, 0, 1}};
+
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_LOCAL,
+		                                                .poseInReferenceSpace = identity_pose};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_local_space);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_LOCAL,
+		                                                .poseInReferenceSpace = y1};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_local_space_y1);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_STAGE,
+		                                                .poseInReferenceSpace = identity_pose};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_stage_space);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_STAGE,
+		                                                .poseInReferenceSpace = y1};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_stage_space_y1);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_VIEW,
+		                                                .poseInReferenceSpace = identity_pose};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_view_space);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
+	{
+		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		                                                .next = NULL,
+		                                                .referenceSpaceType =
+		                                                    XR_REFERENCE_SPACE_TYPE_VIEW,
+		                                                .poseInReferenceSpace = z1};
+
+		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_view_space_z1);
+		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
+			return 1;
+	}
 
 	// --- Create Swapchains
 	uint32_t swapchain_format_count;
-	result = xrEnumerateSwapchainFormats(session, 0, &swapchain_format_count, NULL);
-	if (!xr_check(instance, result, "Failed to get number of supported swapchain formats"))
+	result = xrEnumerateSwapchainFormats(app.oxr.session, 0, &swapchain_format_count, NULL);
+	if (!xr_check(app.oxr.instance, result, "Failed to get number of supported swapchain formats"))
 		return 1;
 
 	printf("Runtime supports %d swapchain formats\n", swapchain_format_count);
 	int64_t swapchain_formats[swapchain_format_count];
-	result = xrEnumerateSwapchainFormats(session, swapchain_format_count, &swapchain_format_count,
-	                                     swapchain_formats);
-	if (!xr_check(instance, result, "Failed to enumerate swapchain formats"))
+	result = xrEnumerateSwapchainFormats(app.oxr.session, swapchain_format_count,
+	                                     &swapchain_format_count, swapchain_formats);
+	if (!xr_check(app.oxr.instance, result, "Failed to enumerate swapchain formats"))
 		return 1;
 
 	// SRGB is usually a better choice than linear
 	// a more sophisticated approach would iterate supported swapchain formats and choose from them
-	int64_t color_format = get_swapchain_format(instance, session, GL_SRGB8_ALPHA8_EXT, true);
+	int64_t color_format =
+	    get_swapchain_format(app.oxr.instance, app.oxr.session, GL_SRGB8_ALPHA8_EXT, true);
 
-	int64_t quad_format = get_swapchain_format(instance, session, GL_RGBA8_EXT, true);
+	int64_t quad_format = get_swapchain_format(app.oxr.instance, app.oxr.session, GL_RGBA8_EXT, true);
 
-	int64_t depth_format = get_swapchain_format(instance, session, GL_DEPTH_COMPONENT16, false);
+	int64_t depth_format =
+	    get_swapchain_format(app.oxr.instance, app.oxr.session, GL_DEPTH_COMPONENT16, false);
 	if (depth_format < 0) {
 		printf("Preferred depth format GL_DEPTH_COMPONENT16 not supported, disabling depth\n");
-		ext.depth.supported = false;
+		ext.depth.base.supported = false;
 	} else {
-		ext.depth.supported = true;
+		ext.depth.base.supported = true;
 	}
 
 	XrSwapchainUsageFlags color_flags =
 	    XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-	if (!create_swapchain_from_views(instance, session, &vr_swapchains[SWAPCHAIN_PROJECTION],
-	                                 view_count, color_format, viewconfig_views, color_flags))
+	if (!create_swapchain_from_views(app.oxr.instance, app.oxr.session,
+	                                 &vr_swapchains[SWAPCHAIN_PROJECTION], app.oxr.view_count,
+	                                 color_format, app.oxr.viewconfig_views, color_flags))
 		return 1;
 
-	if (ext.depth.supported) {
+	if (ext.depth.base.supported) {
 		XrSwapchainUsageFlags depth_flags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		if (!create_swapchain_from_views(instance, session, &vr_swapchains[SWAPCHAIN_DEPTH], view_count,
-		                                 depth_format, viewconfig_views, depth_flags)) {
+		if (!create_swapchain_from_views(app.oxr.instance, app.oxr.session,
+		                                 &vr_swapchains[SWAPCHAIN_DEPTH], app.oxr.view_count,
+		                                 depth_format, app.oxr.viewconfig_views, depth_flags)) {
 			return 1;
 		}
 	}
 
-	if (!create_one_swapchain(instance, session, &quad_layer.swapchain, quad_format, 1,
-	                          quad_layer.pixel_width, quad_layer.pixel_height, color_flags))
+	if (!create_one_swapchain(app.oxr.instance, app.oxr.session, &quad_layer.swapchain, quad_format,
+	                          1, quad_layer.pixel_width, quad_layer.pixel_height, color_flags))
 		return 1;
 
 	// Do not allocate these every frame to save some resources
-	views = (XrView*)malloc(sizeof(XrView) * view_count);
-	projection_views = (XrCompositionLayerProjectionView*)malloc(
-	    sizeof(XrCompositionLayerProjectionView) * view_count);
-	for (uint32_t i = 0; i < view_count; i++) {
-		views[i].type = XR_TYPE_VIEW;
-		views[i].next = NULL;
+	app.oxr.views = (XrView*)malloc(sizeof(XrView) * app.oxr.view_count);
+	app.oxr.projection_views = (XrCompositionLayerProjectionView*)malloc(
+	    sizeof(XrCompositionLayerProjectionView) * app.oxr.view_count);
+	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
+		app.oxr.views[i].type = XR_TYPE_VIEW;
+		app.oxr.views[i].next = NULL;
 
-		projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-		projection_views[i].next = NULL;
+		app.oxr.projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+		app.oxr.projection_views[i].next = NULL;
 
-		projection_views[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i];
-		projection_views[i].subImage.imageArrayIndex = 0;
-		projection_views[i].subImage.imageRect.offset.x = 0;
-		projection_views[i].subImage.imageRect.offset.y = 0;
-		projection_views[i].subImage.imageRect.extent.width =
-		    viewconfig_views[i].recommendedImageRectWidth;
-		projection_views[i].subImage.imageRect.extent.height =
-		    viewconfig_views[i].recommendedImageRectHeight;
+		app.oxr.projection_views[i].subImage.swapchain =
+		    vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i];
+		app.oxr.projection_views[i].subImage.imageArrayIndex = 0;
+		app.oxr.projection_views[i].subImage.imageRect.offset.x = 0;
+		app.oxr.projection_views[i].subImage.imageRect.offset.y = 0;
+		app.oxr.projection_views[i].subImage.imageRect.extent.width =
+		    app.oxr.viewconfig_views[i].recommendedImageRectWidth;
+		app.oxr.projection_views[i].subImage.imageRect.extent.height =
+		    app.oxr.viewconfig_views[i].recommendedImageRectHeight;
 
 		// projection_views[i].{pose, fov} have to be filled every frame in frame loop
 	};
 
 
-	if (ext.depth.supported) {
+	if (ext.depth.base.supported) {
 		ext.depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
-		    sizeof(XrCompositionLayerDepthInfoKHR) * view_count);
-		for (uint32_t i = 0; i < view_count; i++) {
+		    sizeof(XrCompositionLayerDepthInfoKHR) * app.oxr.view_count);
+		for (uint32_t i = 0; i < app.oxr.view_count; i++) {
 			ext.depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
 			ext.depth.infos[i].next = NULL;
 			ext.depth.infos[i].minDepth = 0.f;
 			ext.depth.infos[i].maxDepth = 1.f;
-			ext.depth.infos[i].nearZ = gl_rendering.near_z;
-			ext.depth.infos[i].farZ = gl_rendering.far_z;
+			ext.depth.infos[i].nearZ = app.gl_renderer.near_z;
+			ext.depth.infos[i].farZ = app.gl_renderer.far_z;
 
 			ext.depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
 
@@ -1593,28 +1824,28 @@ main(int argc, char** argv)
 			ext.depth.infos[i].subImage.imageRect.offset.x = 0;
 			ext.depth.infos[i].subImage.imageRect.offset.y = 0;
 			ext.depth.infos[i].subImage.imageRect.extent.width =
-			    viewconfig_views[i].recommendedImageRectWidth;
+			    app.oxr.viewconfig_views[i].recommendedImageRectWidth;
 			ext.depth.infos[i].subImage.imageRect.extent.height =
-			    viewconfig_views[i].recommendedImageRectHeight;
+			    app.oxr.viewconfig_views[i].recommendedImageRectHeight;
 
-			projection_views[i].next = &ext.depth.infos[i];
+			app.oxr.projection_views[i].next = &ext.depth.infos[i];
 		};
 	}
 
 
 	// get info from fb_refresh_rate
-	if (ext.refresh_rate.supported) {
+	if (ext.refresh_rate.base.supported) {
 		uint32_t refresh_rate_count;
-		result =
-		    ext.refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB(session, 0, &refresh_rate_count, NULL);
-		if (!xr_check(instance, result, "failed to enumerate refresh rate count"))
+		result = ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(app.oxr.session, 0,
+		                                                           &refresh_rate_count, NULL);
+		if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rate count"))
 			return 1;
 
 		if (refresh_rate_count > 0) {
 			float* refresh_rates = malloc(sizeof(float) * refresh_rate_count);
-			result = ext.refresh_rate.pfnxrEnumerateDisplayRefreshRatesFB(
-			    session, refresh_rate_count, &refresh_rate_count, refresh_rates);
-			if (!xr_check(instance, result, "failed to enumerate refresh rates")) {
+			result = ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(
+			    app.oxr.session, refresh_rate_count, &refresh_rate_count, refresh_rates);
+			if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rates")) {
 				free(refresh_rates);
 				return 1;
 			}
@@ -1626,9 +1857,9 @@ main(int argc, char** argv)
 
 			// refresh rates are ordered lowest to highest
 			printf("Requesting refresh rate %f\n", refresh_rates[refresh_rate_count - 1]);
-			result = ext.refresh_rate.pfnxrRequestDisplayRefreshRateFB(
-			    session, refresh_rates[refresh_rate_count - 1]);
-			if (!xr_check(instance, result, "failed to request refresh rate %f",
+			result = ext.refresh_rate.xrRequestDisplayRefreshRateFB(
+			    app.oxr.session, refresh_rates[refresh_rate_count - 1]);
+			if (!xr_check(app.oxr.instance, result, "failed to request refresh rate %f",
 			              refresh_rates[refresh_rate_count - 1]))
 				return 1;
 
@@ -1636,8 +1867,8 @@ main(int argc, char** argv)
 		}
 
 		float refresh_rate = 0;
-		result = ext.refresh_rate.pfnxrGetDisplayRefreshRateFB(session, &refresh_rate);
-		if (!xr_check(instance, result, "failed to get refresh rate"))
+		result = ext.refresh_rate.xrGetDisplayRefreshRateFB(app.oxr.session, &refresh_rate);
+		if (!xr_check(app.oxr.instance, result, "failed to get refresh rate"))
 			return 1;
 
 		printf("Current refresh rate: %f Hz\n", refresh_rate);
@@ -1646,8 +1877,8 @@ main(int argc, char** argv)
 
 	// --- Set up input (actions)
 
-	xrStringToPath(instance, "/user/hand/left", &hand_paths[HAND_LEFT_INDEX]);
-	xrStringToPath(instance, "/user/hand/right", &hand_paths[HAND_RIGHT_INDEX]);
+	xrStringToPath(app.oxr.instance, "/user/hand/left", &hand_paths[HAND_LEFT_INDEX]);
+	xrStringToPath(app.oxr.instance, "/user/hand/right", &hand_paths[HAND_RIGHT_INDEX]);
 
 	XrActionSetCreateInfo gameplay_actionset_info = {
 	    .type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = NULL, .priority = 0};
@@ -1655,96 +1886,129 @@ main(int argc, char** argv)
 	strcpy(gameplay_actionset_info.localizedActionSetName, "Gameplay Actions");
 
 	XrActionSet gameplay_actionset;
-	result = xrCreateActionSet(instance, &gameplay_actionset_info, &gameplay_actionset);
-	if (!xr_check(instance, result, "failed to create actionset"))
+	result = xrCreateActionSet(app.oxr.instance, &gameplay_actionset_info, &gameplay_actionset);
+	if (!xr_check(app.oxr.instance, result, "failed to create actionset"))
 		return 1;
 
 
 	// Grabbing objects is not actually implemented in this demo, it only gives some  haptic feebdack.
-	struct action_t grab_action = {.action = XR_NULL_HANDLE,
-	                               .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
-	if (!create_action(instance, XR_ACTION_TYPE_FLOAT_INPUT, "grabobjectfloat", "Grab Object",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &grab_action.action))
+	app.grab_action =
+	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
+	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "grabobjectfloat", "Grab Object",
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.grab_action.action))
 		return 1;
+
 
 	// A 1D action that is fed by one axis of a 2D input (y axis of thumbstick).
-	struct action_t accelerate_action = {.action = XR_NULL_HANDLE,
-	                                     .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
-	if (!create_action(instance, XR_ACTION_TYPE_FLOAT_INPUT, "accelerate", "Accelerate",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &accelerate_action.action))
+	app.accelerate_action =
+	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
+	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "accelerate", "Accelerate",
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.accelerate_action.action))
 		return 1;
 
-	struct action_t hand_pose_action = {.action = XR_NULL_HANDLE,
-	                                    .action_type = XR_ACTION_TYPE_POSE_INPUT};
-	if (!create_action(instance, XR_ACTION_TYPE_POSE_INPUT, "handpose", "Hand Pose",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &hand_pose_action.action))
+	app.hand_pose_action =
+	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
+	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "handpose", "Hand Pose",
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.hand_pose_action.action))
 		return 1;
-	if (!create_action_space(instance, session, &hand_pose_action, hand_paths))
+	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.hand_pose_action, hand_paths))
 		return 1;
 
+	app.aim_action =
+	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
+	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "aim", "Aim Pose",
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.aim_action.action))
+		return 1;
+	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.aim_action, hand_paths))
+		return 1;
 
-	struct action_t haptic_action = {.action = XR_NULL_HANDLE,
-	                                 .action_type = XR_ACTION_TYPE_VIBRATION_OUTPUT};
-	if (!create_action(instance, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic", "Haptic Vibration",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &haptic_action.action))
+	app.haptic_action =
+	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_VIBRATION_OUTPUT};
+	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic",
+	                   "Haptic Vibration", gameplay_actionset, HAND_COUNT, hand_paths,
+	                   &app.haptic_action.action))
 		return 1;
 
 
 	struct Binding simple_bindings[] = {
-	    {.action = grab_action.action,
+	    {.action = app.grab_action.action,
 	     .paths = {"/user/hand/left/input/select/click", "/user/hand/right/input/select/click"},
 	     .path_count = 2},
-	    {.action = hand_pose_action.action,
+	    {.action = app.hand_pose_action.action,
 	     .paths = {"/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose"},
 	     .path_count = 2},
-	    {.action = haptic_action.action,
+	    {.action = app.aim_action.action,
+	     .paths = {"/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose"},
+	     .path_count = 2},
+	    {.action = app.haptic_action.action,
 	     .paths = {"/user/hand/left/output/haptic", "/user/hand/right/output/haptic"},
 	     .path_count = 2},
 	};
-	if (!suggest_actions(instance, "/interaction_profiles/khr/simple_controller", simple_bindings,
-	                     ARRAY_SIZE(simple_bindings)))
+	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/khr/simple_controller",
+	                     simple_bindings, ARRAY_SIZE(simple_bindings)))
 		return 1;
 
 
 	struct Binding touch_bindings[] = {
-	    {.action = grab_action.action,
+	    {.action = app.grab_action.action,
 	     .paths = {"/user/hand/left/input/trigger/value", "/user/hand/right/input/trigger/value"},
 	     .path_count = 2},
-	    {.action = accelerate_action.action,
+	    {.action = app.accelerate_action.action,
 	     .paths = {"/user/hand/left/input/thumbstick/y", "/user/hand/right/input/thumbstick/y"},
 	     .path_count = 2},
-	    {.action = hand_pose_action.action,
+	    {.action = app.hand_pose_action.action,
 	     .paths = {"/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose"},
 	     .path_count = 2},
-	    {.action = haptic_action.action,
+	    {.action = app.haptic_action.action,
 	     .paths = {"/user/hand/left/output/haptic", "/user/hand/right/output/haptic"},
 	     .path_count = 2},
 	};
-	if (!suggest_actions(instance, "/interaction_profiles/oculus/touch_controller", touch_bindings,
-	                     ARRAY_SIZE(touch_bindings)))
+	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/oculus/touch_controller",
+	                     touch_bindings, ARRAY_SIZE(touch_bindings)))
 		return 1;
 
 	struct Binding index_bindings[] = {
-	    {.action = grab_action.action,
+	    {.action = app.grab_action.action,
 	     .paths = {"/user/hand/left/input/trigger/value", "/user/hand/right/input/trigger/value"},
 	     .path_count = 2},
-	    {.action = accelerate_action.action,
+	    {.action = app.accelerate_action.action,
 	     .paths = {"/user/hand/left/input/thumbstick/y", "/user/hand/right/input/thumbstick/y"},
 	     .path_count = 2},
-	    {.action = hand_pose_action.action,
+	    {.action = app.hand_pose_action.action,
 	     .paths = {"/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose"},
 	     .path_count = 2},
-	    {.action = haptic_action.action,
+	    {.action = app.aim_action.action,
+	     .paths = {"/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose"},
+	     .path_count = 2},
+	    {.action = app.haptic_action.action,
 	     .paths = {"/user/hand/left/output/haptic", "/user/hand/right/output/haptic"},
 	     .path_count = 2},
 	};
-	if (!suggest_actions(instance, "/interaction_profiles/valve/index_controller", index_bindings,
-	                     ARRAY_SIZE(index_bindings)))
+	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/valve/index_controller",
+	                     index_bindings, ARRAY_SIZE(index_bindings)))
 		return 1;
 
 
+	struct Binding vive_bindings[] = {
+	    {.action = app.grab_action.action,
+	     .paths = {"/user/hand/left/input/trigger/value", "/user/hand/right/input/trigger/value"},
+	     .path_count = 2},
+	    {.action = app.hand_pose_action.action,
+	     .paths = {"/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose"},
+	     .path_count = 2},
+	    {.action = app.aim_action.action,
+	     .paths = {"/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose"},
+	     .path_count = 2},
+	    {.action = app.haptic_action.action,
+	     .paths = {"/user/hand/left/output/haptic", "/user/hand/right/output/haptic"},
+	     .path_count = 2},
+	};
+	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/htc/vive_controller", vive_bindings,
+	                     ARRAY_SIZE(vive_bindings)))
+		return 1;
+
 	if (ext.hand_tracking.system_supported) {
-		if (!create_hand_trackers(instance, session, &ext.hand_tracking))
+		if (!create_hand_trackers(app.oxr.instance, app.oxr.session, &ext.hand_tracking))
 			return 1;
 	}
 
@@ -1752,9 +2016,9 @@ main(int argc, char** argv)
 	glXMakeCurrent(graphics_binding_gl.xDisplay, graphics_binding_gl.glxDrawable,
 	               graphics_binding_gl.glxContext);
 
-	// Set up rendering (compile shaders, ...) before starting the session
-	if (init_gl(view_count, vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths, &gl_rendering) !=
-	    0) {
+	// Set up rendering (compile shaders, ...) before starting the app.oxr.session
+	if (init_gl(app.oxr.view_count, vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths,
+	            &app.gl_renderer) != 0) {
 		printf("OpenGl setup failed!\n");
 		return 1;
 	}
@@ -1764,13 +2028,16 @@ main(int argc, char** argv)
 	    .next = NULL,
 	    .countActionSets = 1,
 	    .actionSets = &gameplay_actionset};
-	result = xrAttachSessionActionSets(session, &actionset_attach_info);
-	if (!xr_check(instance, result, "failed to attach action set"))
+	result = xrAttachSessionActionSets(app.oxr.session, &actionset_attach_info);
+	if (!xr_check(app.oxr.instance, result, "failed to attach action set"))
 		return 1;
 
 
+
+	uint64_t frame_count = 0;
+
 	bool quit_renderloop = false;
-	bool session_running = false; // to avoid beginning an already running session
+	bool session_running = false; // to avoid beginning an already running app.oxr.session
 	while (!quit_renderloop) {
 
 		// --- Poll SDL for events so we can exit with esc
@@ -1779,12 +2046,12 @@ main(int argc, char** argv)
 			if (sdl_event.type == SDL_QUIT ||
 			    (sdl_event.type == SDL_KEYDOWN && sdl_event.key.keysym.sym == SDLK_ESCAPE)) {
 				printf("Requesting exit...\n");
-				xrRequestExitSession(session);
+				xrRequestExitSession(app.oxr.session);
 			}
 		}
 
 
-		// for several session states we want to skip the render loop
+		// for several app.oxr.session app.oxr.states we want to skip the render loop
 		bool skip_renderloop = false;
 
 		// --- Handle runtime Events
@@ -1793,7 +2060,7 @@ main(int argc, char** argv)
 		// uselessly render or submit one. Calling xrWaitFrame commits you to
 		// calling xrBeginFrame eventually.
 		XrEventDataBuffer runtime_event = {.type = XR_TYPE_EVENT_DATA_BUFFER, .next = NULL};
-		XrResult poll_result = xrPollEvent(instance, &runtime_event);
+		XrResult poll_result = xrPollEvent(app.oxr.instance, &runtime_event);
 		while (poll_result == XR_SUCCESS) {
 			switch (runtime_event.type) {
 			case XR_TYPE_EVENT_DATA_EVENTS_LOST: {
@@ -1804,17 +2071,19 @@ main(int argc, char** argv)
 			}
 			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: {
 				XrEventDataInstanceLossPending* event = (XrEventDataInstanceLossPending*)&runtime_event;
-				printf("EVENT: instance loss pending at %lu! Destroying instance.\n", event->lossTime);
+				printf("EVENT: app.oxr.instance loss pending at %lu! Destroying app.oxr.instance.\n",
+				       event->lossTime);
 				quit_renderloop = true;
 				continue;
 			}
 			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
 				XrEventDataSessionStateChanged* event = (XrEventDataSessionStateChanged*)&runtime_event;
-				printf("EVENT: session state changed from %d to %d\n", state, event->state);
-				state = event->state;
+				printf("EVENT: app.oxr.session app.oxr.state changed from %d to %d\n", app.oxr.state,
+				       event->state);
+				app.oxr.state = event->state;
 
-				// react to session state changes, see OpenXR spec 9.3 diagram
-				switch (state) {
+				// react to app.oxr.session app.oxr.state changes, see OpenXR spec 9.3 diagram
+				switch (app.oxr.state) {
 
 				// just keep polling, skip render loop
 				case XR_SESSION_STATE_MAX_ENUM:
@@ -1822,7 +2091,7 @@ main(int argc, char** argv)
 				case XR_SESSION_STATE_IDLE:
 				case XR_SESSION_STATE_UNKNOWN: {
 					skip_renderloop = true;
-					break; // state handling switch
+					break; // app.oxr.state handling switch
 				}
 
 				// do nothing, run render loop normally
@@ -1830,50 +2099,51 @@ main(int argc, char** argv)
 				case XR_SESSION_STATE_SYNCHRONIZED:
 				case XR_SESSION_STATE_VISIBLE: {
 					skip_renderloop = false;
-					break; // state handling switch
+					break; // app.oxr.state handling switch
 				}
 
-				// begin session and then run render loop
+				// begin app.oxr.session and then run render loop
 				case XR_SESSION_STATE_READY: {
-					// start session only if it is not running, i.e. not when we already called xrBeginSession
-					// but the runtime did not switch to the next state yet
+					// start app.oxr.session only if it is not running, i.e. not when we already called
+					// xrBeginSession but the runtime did not switch to the next app.oxr.state yet
 					if (!session_running) {
 						XrSessionBeginInfo session_begin_info = {.type = XR_TYPE_SESSION_BEGIN_INFO,
 						                                         .next = NULL,
-						                                         .primaryViewConfigurationType = view_type};
-						result = xrBeginSession(session, &session_begin_info);
-						if (!xr_check(instance, result, "Failed to begin session!"))
+						                                         .primaryViewConfigurationType =
+						                                             app.oxr.view_type};
+						result = xrBeginSession(app.oxr.session, &session_begin_info);
+						if (!xr_check(app.oxr.instance, result, "Failed to begin session!"))
 							return 1;
 						printf("Session started!\n");
 						session_running = true;
 					}
 					skip_renderloop = false;
-					break; // state handling switch
+					break; // app.oxr.state handling switch
 				}
 
-				// end session, skip render loop, keep polling for next state change
+				// end app.oxr.session, skip render loop, keep polling for next app.oxr.state change
 				case XR_SESSION_STATE_STOPPING: {
-					// end session only if it is running, i.e. not when we already called xrEndSession but the
-					// runtime did not switch to the next state yet
+					// end app.oxr.session only if it is running, i.e. not when we already called xrEndSession
+					// but the runtime did not switch to the next app.oxr.state yet
 					if (session_running) {
-						result = xrEndSession(session);
-						if (!xr_check(instance, result, "Failed to end session!"))
+						result = xrEndSession(app.oxr.session);
+						if (!xr_check(app.oxr.instance, result, "Failed to end app.oxr.session!"))
 							return 1;
 						session_running = false;
 					}
 					skip_renderloop = true;
-					break; // state handling switch
+					break; // app.oxr.state handling switch
 				}
 
-				// destroy session, skip render loop, exit render loop and quit
+				// destroy app.oxr.session, skip render loop, exit render loop and quit
 				case XR_SESSION_STATE_LOSS_PENDING:
 				case XR_SESSION_STATE_EXITING:
-					result = xrDestroySession(session);
-					if (!xr_check(instance, result, "Failed to destroy session!"))
+					result = xrDestroySession(app.oxr.session);
+					if (!xr_check(app.oxr.instance, result, "Failed to destroy app.oxr.session!"))
 						return 1;
 					quit_renderloop = true;
 					skip_renderloop = true;
-					break; // state handling switch
+					break; // app.oxr.state handling switch
 				}
 				break;
 			}
@@ -1894,16 +2164,17 @@ main(int argc, char** argv)
 				XrInteractionProfileState state = {.type = XR_TYPE_INTERACTION_PROFILE_STATE};
 
 				for (int i = 0; i < 2; i++) {
-					XrResult res = xrGetCurrentInteractionProfile(session, hand_paths[i], &state);
-					if (!xr_check(instance, res, "Failed to get interaction profile for %d", i))
+					XrResult res = xrGetCurrentInteractionProfile(app.oxr.session, hand_paths[i], &state);
+					if (!xr_check(app.oxr.instance, res, "Failed to get interaction profile for %d", i))
 						continue;
 
 					XrPath prof = state.interactionProfile;
 
 					uint32_t strl;
 					char profile_str[XR_MAX_PATH_LENGTH];
-					res = xrPathToString(instance, prof, XR_MAX_PATH_LENGTH, &strl, profile_str);
-					if (!xr_check(instance, res, "Failed to get interaction profile path str for %d", i))
+					res = xrPathToString(app.oxr.instance, prof, XR_MAX_PATH_LENGTH, &strl, profile_str);
+					if (!xr_check(app.oxr.instance, res, "Failed to get interaction profile path str for %d",
+					              i))
 						continue;
 
 					printf("Event: Interaction profile changed for %d: %s\n", i, profile_str);
@@ -1931,7 +2202,7 @@ main(int argc, char** argv)
 			}
 
 			runtime_event.type = XR_TYPE_EVENT_DATA_BUFFER;
-			poll_result = xrPollEvent(instance, &runtime_event);
+			poll_result = xrPollEvent(app.oxr.instance, &runtime_event);
 		}
 		if (poll_result == XR_EVENT_UNAVAILABLE) {
 			// processed all events in the queue
@@ -1944,11 +2215,13 @@ main(int argc, char** argv)
 			continue;
 		}
 
+		frame_count++;
+
 		// --- Wait for our turn to do head-pose dependent computation and render a frame
 		XrFrameState frameState = {.type = XR_TYPE_FRAME_STATE, .next = NULL};
 		XrFrameWaitInfo frameWaitInfo = {.type = XR_TYPE_FRAME_WAIT_INFO, .next = NULL};
-		result = xrWaitFrame(session, &frameWaitInfo, &frameState);
-		if (!xr_check(instance, result, "xrWaitFrame() was not successful, exiting..."))
+		result = xrWaitFrame(app.oxr.session, &frameWaitInfo, &frameState);
+		if (!xr_check(app.oxr.instance, result, "xrWaitFrame() was not successful, exiting..."))
 			break;
 
 
@@ -1959,17 +2232,17 @@ main(int argc, char** argv)
 		                                     .viewConfigurationType =
 		                                         XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
 		                                     .displayTime = frameState.predictedDisplayTime,
-		                                     .space = play_space};
+		                                     .space = app.oxr.play_space};
 
-		XrView views[view_count];
-		for (uint32_t i = 0; i < view_count; i++) {
-			views[i].type = XR_TYPE_VIEW;
-			views[i].next = NULL;
+		for (uint32_t i = 0; i < app.oxr.view_count; i++) {
+			app.oxr.views[i].type = XR_TYPE_VIEW;
+			app.oxr.views[i].next = NULL;
 		};
 
-		XrViewState view_state = {.type = XR_TYPE_VIEW_STATE, .next = NULL};
-		result = xrLocateViews(session, &view_locate_info, &view_state, view_count, &view_count, views);
-		if (!xr_check(instance, result, "Could not locate views"))
+		app.oxr.view_state = (XrViewState){.type = XR_TYPE_VIEW_STATE, .next = NULL};
+		result = xrLocateViews(app.oxr.session, &view_locate_info, &app.oxr.view_state,
+		                       app.oxr.view_count, &app.oxr.view_count, app.oxr.views);
+		if (!xr_check(app.oxr.instance, result, "Could not locate views"))
 			break;
 
 
@@ -1982,24 +2255,33 @@ main(int argc, char** argv)
 		    .countActiveActionSets = sizeof(active_actionsets) / sizeof(active_actionsets[0]),
 		    .activeActionSets = active_actionsets,
 		};
-		result = xrSyncActions(session, &actions_sync_info);
-		xr_check(instance, result, "failed to sync actions!");
+		result = xrSyncActions(app.oxr.session, &actions_sync_info);
+		xr_check(app.oxr.instance, result, "failed to sync actions!");
 
 		for (int i = 0; i < HAND_COUNT; i++) {
-			if (!get_action_data(instance, session, &hand_pose_action, i, hand_paths, play_space,
-			                     frameState.predictedDisplayTime, query_hand_velocities))
-				printf("Failed to get hand pose action datafor hand %d\n", i);
+			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.hand_pose_action, i, hand_paths,
+			                     app.oxr.play_space, frameState.predictedDisplayTime,
+			                     app.query_hand_velocities))
+				printf("Failed to get hand pose action data for hand %d\n", i);
 
-			if (!get_action_data(instance, session, &grab_action, i, hand_paths, XR_NULL_HANDLE, 0,
-			                     false))
+			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.aim_action, i, hand_paths,
+			                     app.oxr.play_space, frameState.predictedDisplayTime,
+			                     app.query_hand_velocities))
+				printf("Failed to get aim pose action data for hand %d\n", i);
+
+
+			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.grab_action, i, hand_paths,
+			                     XR_NULL_HANDLE, 0, false))
 				printf("Failed to get grab action data for hand %d\n", i);
 
-			if (!get_action_data(instance, session, &accelerate_action, i, hand_paths, XR_NULL_HANDLE, 0,
-			                     false))
+			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.accelerate_action, i, hand_paths,
+			                     XR_NULL_HANDLE, 0, false))
 				printf("Failed to get accelerate action data for hand %d\n", i);
 
-			if (grab_action.states[i].float_.isActive &&
-			    grab_action.states[i].float_.currentState > 0.75) {
+
+
+			if (app.grab_action.states[i].float_.isActive &&
+			    app.grab_action.states[i].float_.currentState > 0.75) {
 				XrHapticVibration vibration = {.type = XR_TYPE_HAPTIC_VIBRATION,
 				                               .next = NULL,
 				                               .amplitude = 0.5,
@@ -2008,33 +2290,67 @@ main(int argc, char** argv)
 
 				XrHapticActionInfo haptic_action_info = {.type = XR_TYPE_HAPTIC_ACTION_INFO,
 				                                         .next = NULL,
-				                                         .action = haptic_action.action,
+				                                         .action = app.haptic_action.action,
 				                                         .subactionPath = hand_paths[i]};
-				result = xrApplyHapticFeedback(session, &haptic_action_info,
+				result = xrApplyHapticFeedback(app.oxr.session, &haptic_action_info,
 				                               (const XrHapticBaseHeader*)&vibration);
-				xr_check(instance, result, "failed to apply haptic feedback!");
+				xr_check(app.oxr.instance, result, "failed to apply haptic feedback!");
 				// printf("Sent haptic output to hand %d\n", i);
 			}
 
 
-			if (accelerate_action.states[i].float_.isActive &&
-			    accelerate_action.states[i].float_.currentState != 0) {
+			if (app.accelerate_action.states[i].float_.isActive &&
+			    app.accelerate_action.states[i].float_.currentState != 0) {
 				printf("Throttle value %d: changed %d: %f\n", i,
-				       accelerate_action.states[i].float_.changedSinceLastSync,
-				       accelerate_action.states[i].float_.currentState);
+				       app.accelerate_action.states[i].float_.changedSinceLastSync,
+				       app.accelerate_action.states[i].float_.currentState);
 			}
 
 			if (ext.hand_tracking.system_supported) {
-				get_hand_tracking(instance, play_space, frameState.predictedDisplayTime,
-				                  query_joint_velocities, &ext.hand_tracking, i);
+				get_hand_tracking(app.oxr.instance, app.oxr.play_space, frameState.predictedDisplayTime,
+				                  app.query_joint_velocities, &ext.hand_tracking, i);
 			}
 		};
+
+
+		if (app.cube.enabled) {
+			if (app.cube.pos_ts != 0) {
+				XrDuration diff_ns = frameState.predictedDisplayTime - app.cube.pos_ts;
+				float diff_s = (double)diff_ns * 1. / 1000. * 1. / 1000. * 1. / 1000.;
+				XrVector3f next_pos = {
+				    .x = app.cube.current_pos.x += app.cube.velocity.x * diff_s,
+				    .y = app.cube.current_pos.y += app.cube.velocity.y * diff_s,
+				    .z = app.cube.current_pos.z += app.cube.velocity.z * diff_s,
+				};
+				if (next_pos.x > app.cube.center_pos.x + app.cube.bouncing_lengths.x || //
+				    next_pos.y > app.cube.center_pos.y + app.cube.bouncing_lengths.y || //
+				    next_pos.z > app.cube.center_pos.z + app.cube.bouncing_lengths.z || //
+				    next_pos.x < app.cube.center_pos.x - app.cube.bouncing_lengths.x || //
+				    next_pos.y < app.cube.center_pos.y - app.cube.bouncing_lengths.y || //
+				    next_pos.z < app.cube.center_pos.z - app.cube.bouncing_lengths.z) {
+					app.cube.velocity.x *= -1;
+					app.cube.velocity.y *= -1;
+					app.cube.velocity.z *= -1;
+
+					next_pos = (XrVector3f){
+					    .x = app.cube.current_pos.x += app.cube.velocity.x * diff_s,
+					    .y = app.cube.current_pos.y += app.cube.velocity.y * diff_s,
+					    .z = app.cube.current_pos.z += app.cube.velocity.z * diff_s,
+					};
+				}
+				app.cube.current_pos = next_pos;
+				// printf("render cube at %f %f %f\n", app.cube.current_pos.x, app.cube.current_pos.y,
+				// app.cube.current_pos.z);
+			}
+
+			app.cube.pos_ts = frameState.predictedDisplayTime;
+		}
 
 		// --- Begin frame
 		XrFrameBeginInfo frame_begin_info = {.type = XR_TYPE_FRAME_BEGIN_INFO, .next = NULL};
 
-		result = xrBeginFrame(session, &frame_begin_info);
-		if (!xr_check(instance, result, "failed to begin frame!"))
+		result = xrBeginFrame(app.oxr.session, &frame_begin_info);
+		if (!xr_check(app.oxr.instance, result, "failed to begin frame!"))
 			break;
 
 		// all swapchain release infos happen to be the same
@@ -2042,67 +2358,60 @@ main(int argc, char** argv)
 		                                            .next = NULL};
 
 		// render projection layer (once per view) and fill projection_views with the result
-		for (uint32_t i = 0; i < view_count; i++) {
-			XrMatrix4x4f projection_matrix;
-			XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, views[i].fov,
-			                                 gl_rendering.near_z, gl_rendering.far_z);
-
-			XrMatrix4x4f view_matrix;
-			XrMatrix4x4f_CreateViewMatrix(&view_matrix, &views[i].pose.position,
-			                              &views[i].pose.orientation);
-
-
+		for (uint32_t i = 0; i < app.oxr.view_count; i++) {
 			uint32_t projection_index;
-			if (!acquire_swapchain(instance, &vr_swapchains[SWAPCHAIN_PROJECTION], i, &projection_index))
+			if (!acquire_swapchain(app.oxr.instance, &vr_swapchains[SWAPCHAIN_PROJECTION], i,
+			                       &projection_index))
 				break;
 
 			uint32_t depth_index = 0;
-			if (ext.depth.supported) {
-				if (!acquire_swapchain(instance, &vr_swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
+			if (ext.depth.base.supported) {
+				if (!acquire_swapchain(app.oxr.instance, &vr_swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
 					break;
 			}
 
-			GLuint depth_image =
-			    ext.depth.supported ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image : 0;
+			GLuint depth_image = ext.depth.base.supported
+			                         ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image
+			                         : 0;
 			GLuint projection_image =
 			    vr_swapchains[SWAPCHAIN_PROJECTION].images[i][projection_index].image;
 
-			int w = viewconfig_views[i].recommendedImageRectWidth;
-			int h = viewconfig_views[i].recommendedImageRectHeight;
+			int w = app.oxr.viewconfig_views[i].recommendedImageRectWidth;
+			int h = app.oxr.viewconfig_views[i].recommendedImageRectHeight;
 
 			// TODO: should not be necessary, but is for SteamVR 1.16.4 (but not 1.15.x)
 			glXMakeCurrent(graphics_binding_gl.xDisplay, graphics_binding_gl.glxDrawable,
 			               graphics_binding_gl.glxContext);
 
-			render_frame(w, h, &gl_rendering, projection_index, frameState.predictedDisplayTime, i,
-			             hand_pose_action.pose_locations, &ext.hand_tracking, projection_matrix,
-			             view_matrix, projection_image, ext.depth.supported, depth_image);
+			render_frame(&app, w, h, &app.gl_renderer, projection_index, frameState.predictedDisplayTime,
+			             i, app.hand_pose_action.pose_locations, &ext.hand_tracking, &app.oxr.views[i],
+			             projection_image, ext.depth.base.supported, depth_image);
 
 			result =
 			    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i], &release_info);
-			if (!xr_check(instance, result, "failed to release swapchain image!"))
+			if (!xr_check(app.oxr.instance, result, "failed to release swapchain image!"))
 				break;
 
-			if (ext.depth.supported) {
+			if (ext.depth.base.supported) {
 				result =
 				    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i], &release_info);
-				if (!xr_check(instance, result, "failed to release swapchain image!"))
+				if (!xr_check(app.oxr.instance, result, "failed to release swapchain image!"))
 					break;
 			}
 
-			projection_views[i].pose = views[i].pose;
-			projection_views[i].fov = views[i].fov;
+			app.oxr.projection_views[i].pose = app.oxr.views[i].pose;
+			app.oxr.projection_views[i].fov = app.oxr.views[i].fov;
 		}
 
 
 		uint32_t quad_index = 0;
-		if (!acquire_swapchain(instance, &quad_layer.swapchain, 0, &quad_index))
+		if (!acquire_swapchain(app.oxr.instance, &quad_layer.swapchain, 0, &quad_index))
 			break;
 
-		render_quad(&gl_rendering, &quad_layer, quad_index, frameState.predictedDisplayTime);
+		render_quad(&app.gl_renderer, &quad_layer, quad_index, frameState.predictedDisplayTime);
 
 		result = xrReleaseSwapchainImage(quad_layer.swapchain.swapchains[0], &release_info);
-		if (!xr_check(instance, result, "failed to release swapchain image!"))
+		if (!xr_check(app.oxr.instance, result, "failed to release swapchain image!"))
 			break;
 
 
@@ -2111,9 +2420,9 @@ main(int argc, char** argv)
 		    .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
 		    .next = NULL,
 		    .layerFlags = 0,
-		    .space = play_space,
-		    .viewCount = view_count,
-		    .views = projection_views,
+		    .space = app.oxr.play_space,
+		    .viewCount = app.oxr.view_count,
+		    .views = app.oxr.projection_views,
 		};
 
 
@@ -2123,7 +2432,7 @@ main(int argc, char** argv)
 		    .type = XR_TYPE_COMPOSITION_LAYER_QUAD,
 		    .next = NULL,
 		    .layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT,
-		    .space = play_space,
+		    .space = app.oxr.play_space,
 		    .eyeVisibility = XR_EYE_VISIBILITY_BOTH,
 		    .pose = {.orientation = {.x = 0.f, .y = 0.f, .z = 0.f, .w = 1.f},
 		             .position = {.x = 1.5f, .y = .7f, .z = -1.5f}},
@@ -2145,7 +2454,7 @@ main(int argc, char** argv)
 		submitted_layers[submitted_layer_count++] =
 		    (const XrCompositionLayerBaseHeader* const) & quad_comp_layer;
 
-		if ((view_state.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0) {
+		if ((app.oxr.view_state.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0) {
 			printf("Not submitting layers because orientation is invalid\n");
 			submitted_layer_count = 0;
 		}
@@ -2154,35 +2463,35 @@ main(int argc, char** argv)
 		                               .displayTime = frameState.predictedDisplayTime,
 		                               .layerCount = submitted_layer_count,
 		                               .layers = submitted_layers,
-		                               .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+		                               .environmentBlendMode = app.oxr.blend_mode,
 		                               .next = NULL};
-		result = xrEndFrame(session, &frameEndInfo);
-		if (!xr_check(instance, result, "failed to end frame!"))
+		result = xrEndFrame(app.oxr.session, &frameEndInfo);
+		if (!xr_check(app.oxr.instance, result, "failed to end frame!"))
 			break;
 	}
 
 
 
 	// --- Clean up after render loop quits
-	for (uint32_t i = 0; i < view_count; i++) {
+	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
 		free(vr_swapchains[SWAPCHAIN_PROJECTION].images[i]);
-		if (ext.depth.supported) {
+		if (ext.depth.base.supported) {
 			free(vr_swapchains[SWAPCHAIN_DEPTH].images[i]);
 		}
 
 		glDeleteFramebuffers(vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths[i],
-		                     gl_rendering.framebuffers[i]);
-		free(gl_rendering.framebuffers[i]);
+		                     app.gl_renderer.framebuffers[i]);
+		free(app.gl_renderer.framebuffers[i]);
 	}
-	xrDestroyInstance(instance);
+	xrDestroyInstance(app.oxr.instance);
 
-	free(viewconfig_views);
-	free(projection_views);
-	free(views);
+	free(app.oxr.viewconfig_views);
+	free(app.oxr.projection_views);
+	free(app.oxr.views);
 
 	destroy_swapchain(&vr_swapchains[SWAPCHAIN_PROJECTION]);
 	destroy_swapchain(&vr_swapchains[SWAPCHAIN_DEPTH]);
-	free(gl_rendering.framebuffers);
+	free(app.gl_renderer.framebuffers);
 
 	free(ext.depth.infos);
 
@@ -2292,12 +2601,14 @@ static const char* fragmentshader =
     "#version 330 core\n"
     "#extension GL_ARB_explicit_uniform_location : require\n"
     "layout(location = 0) out vec4 FragColor;\n"
-    "layout(location = 1) uniform vec3 uniformColor;\n"
+    "layout(location = 1) uniform vec4 uniformColor;\n"
     "in vec2 vertexColor;\n"
     "void main() {\n"
-    "	FragColor = (uniformColor.x < 0.01 && uniformColor.y < 0.01 && "
-    "uniformColor.z < 0.01) ? vec4(vertexColor, 1.0, 1.0) : vec4(uniformColor, "
-    "1.0);\n"
+    "	FragColor = "
+    "(uniformColor.x < 0.01 && "
+    "uniformColor.y < 0.01 && "
+    "uniformColor.z < 0.01 && "
+    "uniformColor.w < 0.01 ? vec4(vertexColor, 1.0, 1.0) : uniformColor);\n"
     "}\n";
 
 
@@ -2409,6 +2720,11 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 
 	glEnable(GL_DEPTH_TEST);
 
+	gl_renderer->modelLoc = glGetUniformLocation(gl_renderer->shader_program_id, "model");
+	gl_renderer->colorLoc = glGetUniformLocation(gl_renderer->shader_program_id, "uniformColor");
+	gl_renderer->viewLoc = glGetUniformLocation(gl_renderer->shader_program_id, "view");
+	gl_renderer->projLoc = glGetUniformLocation(gl_renderer->shader_program_id, "proj");
+
 	return 0;
 }
 
@@ -2424,22 +2740,21 @@ render_block(XrVector3f* position, XrQuaternionf* orientation, XrVector3f* radi,
 static void
 render_cube(XrVector3f* position, XrQuaternionf* orientation, float cube_size, int modelLoc)
 {
-	XrVector3f s = {cube_size / 2., cube_size / 2., cube_size / 2.};
+	XrVector3f s = {cube_size, cube_size, cube_size};
 	render_block(position, orientation, &s, modelLoc);
 }
 
-void
-render_rotated_cube(
-    vec3_t position, float cube_size, float rotation, float* projection_matrix, int modelLoc)
+static void
+render_simple_cube(vec3_t position, vec3_t cube_size, int modelLoc)
 {
-	mat4_t rotationmatrix = m4_rotation_y(degrees_to_radians(rotation));
-	mat4_t modelmatrix = m4_mul(m4_translation(position),
-	                            m4_scaling(vec3(cube_size / 2., cube_size / 2., cube_size / 2.)));
-	modelmatrix = m4_mul(modelmatrix, rotationmatrix);
+	mat4_t modelmatrix =
+	    m4_mul(m4_translation(position), m4_scaling(vec3(cube_size.x, cube_size.y, cube_size.z)));
 
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix.m);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 }
+
+
 
 static float
 vec3_mag(XrVector3f* vec)
@@ -2453,6 +2768,52 @@ vec3_norm(XrVector3f* vec)
 	float mag = vec3_mag(vec);
 	XrVector3f r = {.x = vec->x / mag, .y = vec->y / mag, .z = vec->z / mag};
 	return r;
+}
+
+static mat4_t
+m4_dir_to_matrix(vec3_t dir)
+{
+	vec3_t z_axis = vec3(0, 0, -1);
+	vec3_t rot_axis = v3_cross(z_axis, dir);
+	float angle = acos(v3_dot(z_axis, dir));
+	return m4_rotation(angle, rot_axis);
+}
+
+static void
+render_vec(struct ApplicationState* app, XrVector3f* vec, XrVector3f* start)
+{
+	float width = 0.005;
+	float lin_len = vec3_mag(vec);
+
+	XrVector3f lin_direction = vec3_norm(vec);
+
+	mat4_t m = m4_identity();
+	m = m4_mul(m, m4_translation(vec3(0, 0, -lin_len / 2.)));
+	m = m4_mul(m, m4_scaling(vec3(width, width, lin_len)));
+	m = m4_mul(m4_dir_to_matrix(vec3(lin_direction.x, lin_direction.y, lin_direction.z)), m);
+	m = m4_mul(m4_translation(vec3(start->x, start->y, start->z)), m);
+
+	glUniformMatrix4fv(app->gl_renderer.modelLoc, 1, GL_FALSE, (float*)m.m);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+
+static void
+render_line(struct ApplicationState* app, XrVector3f* v1, XrVector3f* v2)
+{
+	XrVector3f v1tov2 = {v2->x - v1->x, v2->y - v1->y, v2->z - v1->z};
+	render_vec(app, &v1tov2, v1);
+}
+
+void
+render_rotated_cube(vec3_t position, float cube_size, float rotation, int modelLoc)
+{
+	mat4_t rotationmatrix = m4_rotation_y(degrees_to_radians(rotation));
+	mat4_t modelmatrix = m4_mul(m4_translation(position),
+	                            m4_scaling(vec3(cube_size / 2., cube_size / 2., cube_size / 2.)));
+	modelmatrix = m4_mul(modelmatrix, rotationmatrix);
+
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (float*)modelmatrix.m);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
 static void
@@ -2521,7 +2882,8 @@ glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
 void
-render_frame(int w,
+render_frame(struct ApplicationState* app,
+             int w,
              int h,
              struct gl_renderer_t* gl_renderer,
              uint32_t projection_index,
@@ -2529,8 +2891,7 @@ render_frame(int w,
              int view_index,
              XrSpaceLocation* hand_locations,
              struct hand_tracking_t* hand_tracking,
-             XrMatrix4x4f projectionmatrix,
-             XrMatrix4x4f viewmatrix,
+             XrView* view,
              GLuint image,
              bool depth_supported,
              GLuint depthbuffer)
@@ -2548,25 +2909,29 @@ render_frame(int w,
 		// TODO: need a depth attachment for depth test when rendering to fbo
 	}
 
-	glClearColor(.0f, 0.0f, 0.2f, 1.0f);
+	glClearColor(.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
 	glUseProgram(gl_renderer->shader_program_id);
 	glBindVertexArray(gl_renderer->VAO);
 
-	int modelLoc = glGetUniformLocation(gl_renderer->shader_program_id, "model");
-	int colorLoc = glGetUniformLocation(gl_renderer->shader_program_id, "uniformColor");
-	int viewLoc = glGetUniformLocation(gl_renderer->shader_program_id, "view");
-	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (float*)viewmatrix.m);
-	int projLoc = glGetUniformLocation(gl_renderer->shader_program_id, "proj");
-	glUniformMatrix4fv(projLoc, 1, GL_FALSE, (float*)projectionmatrix.m);
+
+	XrMatrix4x4f projection_matrix;
+	XrMatrix4x4f_CreateProjectionFov(&projection_matrix, GRAPHICS_OPENGL, view->fov,
+	                                 gl_renderer->near_z, gl_renderer->far_z);
+
+	XrMatrix4x4f view_matrix;
+	XrMatrix4x4f_CreateViewMatrix(&view_matrix, &view->pose.position, &view->pose.orientation);
+
+
+	glUniformMatrix4fv(gl_renderer->viewLoc, 1, GL_FALSE, (float*)view_matrix.m);
+	glUniformMatrix4fv(gl_renderer->projLoc, 1, GL_FALSE, (float*)projection_matrix.m);
 
 
 	// render scene with 4 colorful cubes
 	{
 		// the special color value (0, 0, 0) will get replaced by some UV color in the shader
-		glUniform3f(colorLoc, 0.0, 0.0, 0.0);
+		glUniform4f(gl_renderer->colorLoc, 0.0, 0.0, 0.0, 0.0);
 
 		double display_time_seconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
 		const float rotations_per_sec = .25;
@@ -2574,18 +2939,18 @@ render_frame(int w,
 
 		float dist = 1.5f;
 		float height = 0.5f;
-		render_rotated_cube(vec3(0, height, -dist), .33f, angle, projectionmatrix.m, modelLoc);
-		render_rotated_cube(vec3(0, height, dist), .33f, angle, projectionmatrix.m, modelLoc);
-		render_rotated_cube(vec3(dist, height, 0), .33f, angle, projectionmatrix.m, modelLoc);
-		render_rotated_cube(vec3(-dist, height, 0), .33f, angle, projectionmatrix.m, modelLoc);
+		render_rotated_cube(vec3(0, height, -dist), .33f, angle, gl_renderer->modelLoc);
+		render_rotated_cube(vec3(0, height, dist), .33f, angle, gl_renderer->modelLoc);
+		render_rotated_cube(vec3(dist, height, 0), .33f, angle, gl_renderer->modelLoc);
+		render_rotated_cube(vec3(-dist, height, 0), .33f, angle, gl_renderer->modelLoc);
 	}
 
 	// render controllers / hand joints
 	for (int hand = 0; hand < 2; hand++) {
 		if (hand == 0) {
-			glUniform3f(colorLoc, 1.0, 0.5, 0.5);
+			glUniform4f(gl_renderer->colorLoc, 1.0, 0.5, 0.5, 1.0);
 		} else {
-			glUniform3f(colorLoc, 0.5, 1.0, 0.5);
+			glUniform4f(gl_renderer->colorLoc, 0.5, 1.0, 0.5, 1.0);
 		}
 
 
@@ -2604,14 +2969,15 @@ render_frame(int w,
 
 				float size = joint_location->radius;
 				render_cube(&joint_location->pose.position, &joint_location->pose.orientation, size,
-				            modelLoc);
+				            gl_renderer->modelLoc);
 
 				if (joint_locations->next != NULL) {
 					// we set .next only to null or XrHandJointVelocitiesEXT in main
 					XrHandJointVelocitiesEXT* vel = (XrHandJointVelocitiesEXT*)joint_locations->next;
 					if ((vel->jointVelocities[i].velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
 						visualize_velocity(&joint_location->pose, &vel->jointVelocities[i].linearVelocity,
-						                   &vel->jointVelocities[i].angularVelocity, modelLoc, 0.005);
+						                   &vel->jointVelocities[i].angularVelocity, gl_renderer->modelLoc,
+						                   0.005);
 					} else {
 						printf("Joint velocities %d invalid\n", i);
 					}
@@ -2626,17 +2992,42 @@ render_frame(int w,
 		bool hand_location_valid =
 		    //(spaceLocation[hand].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
 		    (hand_locations[hand].locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
-
-		// don't draw blocks unless we know their position'
-		if (!hand_location_valid)
-			continue;
+		bool aim_location_valid =
+		    //(spaceLocation[hand].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+		    (app->aim_action.pose_locations[hand].locationFlags &
+		     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0;
 
 		// the controller blocks itself are only drawn if we didn't draw hand joints'
-		if (!any_joints_valid) {
+		if (!any_joints_valid && hand_location_valid) {
 			XrVector3f scale = {.x = .05f, .y = .05f, .z = .2f};
 			render_block(&hand_locations[hand].pose.position, &hand_locations[hand].pose.orientation,
-			             &scale, modelLoc);
+			             &scale, gl_renderer->modelLoc);
 		}
+
+		if (aim_location_valid) {
+			// always draw an aim pose
+			XrMatrix4x4f aim_model_matrix;
+			XrVector3f aim_model_scale = {.x = 1, .y = 1, .z = 1};
+			XrPosef* aim_pose = &app->aim_action.pose_locations[hand].pose;
+			XrMatrix4x4f_CreateModelMatrix(&aim_model_matrix, &aim_pose->position, &aim_pose->orientation,
+			                               &aim_model_scale);
+
+			XrMatrix4x4f zminus1_matrix;
+			XrMatrix4x4f_CreateTranslation(&zminus1_matrix, 0, 0, -1);
+
+			XrMatrix4x4f aim_zminus1;
+			XrMatrix4x4f_Multiply(&aim_zminus1, &aim_model_matrix, &zminus1_matrix);
+
+			XrVector3f aim_vec = {.x = aim_zminus1.m[12], .y = aim_zminus1.m[13], .z = aim_zminus1.m[14]};
+			glUniform4f(gl_renderer->colorLoc, 1.0, 0.0, 0.0, 0.0);
+			render_line(app, &aim_pose->position, &aim_vec);
+			// render_simple_cube(vec3(aim_vec.x, aim_vec.y, aim_vec.z), vec3(0.1, 0.1, 0.1),
+			// app->gl_renderer.modelLoc);
+		} else if (hand_location_valid && !aim_location_valid) {
+			printf("Hand location %d valid but not aim location\n", hand);
+		}
+
+
 
 		// controller velocities are always drawn if available
 		if (hand_locations[hand].next != NULL) {
@@ -2644,11 +3035,20 @@ render_frame(int w,
 			XrSpaceVelocity* vel = (XrSpaceVelocity*)hand_locations[hand].next;
 			if ((vel->velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
 				visualize_velocity(&hand_locations[hand].pose, &vel->linearVelocity, &vel->angularVelocity,
-				                   modelLoc, 0.005);
+				                   gl_renderer->modelLoc, 0.005);
 			}
 		}
 	}
 
+	if (app->cube.enabled) {
+		if (app->cube.pos_ts != 0) {
+
+			glUniform4f(app->gl_renderer.colorLoc, 1, 1, 1, 0.0);
+			render_simple_cube(
+			    vec3(app->cube.current_pos.x, app->cube.current_pos.y, app->cube.current_pos.z),
+			    vec3(0.1, 0.1, 0.1), app->gl_renderer.modelLoc);
+		}
+	}
 
 	// blit left eye to desktop window
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2671,12 +3071,12 @@ render_frame(int w,
 }
 
 void
-initialze_quad(struct gl_renderer_t* gl_rendering, struct quad_layer_t* quad)
+initialze_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad)
 {
-	glGenTextures(1, &gl_rendering->quad.texture);
+	glGenTextures(1, &gl_renderer->quad.texture);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gl_rendering->quad.texture);
+	glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
 
 	int w = quad->pixel_width;
 	int h = quad->pixel_height;
@@ -2713,26 +3113,26 @@ initialze_quad(struct gl_renderer_t* gl_rendering, struct quad_layer_t* quad)
 	             (GLvoid*)rgb);
 	free(rgb);
 
-	glGenFramebuffers(1, &gl_rendering->quad.fbo);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_rendering->quad.fbo);
+	glGenFramebuffers(1, &gl_renderer->quad.fbo);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
 	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-	                       gl_rendering->quad.texture, 0);
+	                       gl_renderer->quad.texture, 0);
 
-	gl_rendering->quad.initialized = true;
+	gl_renderer->quad.initialized = true;
 }
 
 void
-render_quad(struct gl_renderer_t* gl_rendering,
+render_quad(struct gl_renderer_t* gl_renderer,
             struct quad_layer_t* quad,
             uint32_t swapchain_index,
             XrTime predictedDisplayTime)
 {
-	if (!gl_rendering->quad.initialized) {
+	if (!gl_renderer->quad.initialized) {
 		printf("Creating Quad texture\n");
-		initialze_quad(gl_rendering, quad);
+		initialze_quad(gl_renderer, quad);
 	}
 
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_rendering->quad.fbo);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
 
 	GLuint texture = quad->swapchain.images[0][swapchain_index].image;
 	glBindTexture(GL_TEXTURE_2D, texture);
