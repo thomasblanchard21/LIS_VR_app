@@ -1705,6 +1705,25 @@ main(int argc, char** argv)
 	                     ARRAY_SIZE(simple_bindings)))
 		return 1;
 
+
+	struct Binding touch_bindings[] = {
+	    {.action = grab_action.action,
+	     .paths = {"/user/hand/left/input/trigger/value", "/user/hand/right/input/trigger/value"},
+	     .path_count = 2},
+	    {.action = accelerate_action.action,
+	     .paths = {"/user/hand/left/input/thumbstick/y", "/user/hand/right/input/thumbstick/y"},
+	     .path_count = 2},
+	    {.action = hand_pose_action.action,
+	     .paths = {"/user/hand/left/input/grip/pose", "/user/hand/right/input/grip/pose"},
+	     .path_count = 2},
+	    {.action = haptic_action.action,
+	     .paths = {"/user/hand/left/output/haptic", "/user/hand/right/output/haptic"},
+	     .path_count = 2},
+	};
+	if (!suggest_actions(instance, "/interaction_profiles/oculus/touch_controller", touch_bindings,
+	                     ARRAY_SIZE(touch_bindings)))
+		return 1;
+
 	struct Binding index_bindings[] = {
 	    {.action = grab_action.action,
 	     .paths = {"/user/hand/left/input/trigger/value", "/user/hand/right/input/trigger/value"},
