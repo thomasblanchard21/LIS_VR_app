@@ -35,6 +35,7 @@
 #error Only Linux/XLib supported for now
 #endif
 
+#define __USE_XOPEN_EXTENDED // strdup
 #include <string.h>
 
 /*
@@ -640,6 +641,75 @@ get_swapchain_format(XrInstance instance,
 	return chosen_format;
 }
 
+struct action_t
+{
+	XrAction action;
+	XrActionType action_type;
+	union {
+		XrActionStateFloat float_;
+		XrActionStateBoolean boolean_;
+		XrActionStatePose pose_;
+		XrActionStateVector2f vec2f_;
+	} states[HAND_COUNT];
+	XrSpace pose_spaces[HAND_COUNT];
+	XrSpaceLocation pose_locations[HAND_COUNT];
+	XrSpaceVelocity pose_velocities[HAND_COUNT];
+
+	// the subaction paths this action was created with
+	XrPath* subaction_paths;
+	uint32_t subaction_path_count;
+};
+
+bool
+create_action(XrInstance instance,
+              XrActionType type,
+              char* name,
+              char* localized_name,
+              XrActionSet set,
+              int subaction_path_count,
+              XrPath* subaction_paths,
+              struct action_t* out_action)
+{
+	XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
+	                                 .actionType = type,
+	                                 .countSubactionPaths = subaction_path_count,
+	                                 .subactionPaths = subaction_paths};
+	strcpy(actionInfo.actionName, name);
+	strcpy(actionInfo.localizedActionName, localized_name);
+
+	XrResult result = xrCreateAction(set, &actionInfo, &out_action->action);
+	if (!xr_check(instance, result, "Failed to create action %s", name))
+		return false;
+
+	out_action->action_type = type;
+	out_action->subaction_paths = subaction_paths;
+	out_action->subaction_path_count = subaction_path_count;
+
+	return true;
+}
+
+bool
+create_action_space(XrInstance instance,
+                    XrSession session,
+                    struct action_t* action,
+                    XrPath* hand_paths)
+{
+	// poses can't be queried directly, we need to create a space for each
+	for (int hand = 0; hand < HAND_COUNT; hand++) {
+		XrActionSpaceCreateInfo action_space_info = {.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
+		                                             .next = NULL,
+		                                             .action = action->action,
+		                                             .poseInActionSpace = identity_pose,
+		                                             .subactionPath = hand_paths[hand]};
+
+		XrResult result;
+		result = xrCreateActionSpace(session, &action_space_info, &action->pose_spaces[hand]);
+		if (!xr_check(instance, result, "failed to create hand %d pose space", hand))
+			return false;
+	}
+	return true;
+}
+
 struct base_extension_t
 {
 	bool supported;
@@ -693,6 +763,41 @@ struct refresh_rate_t
 	PFN_xrRequestDisplayRefreshRateFB xrRequestDisplayRefreshRateFB;
 };
 
+
+static char* vive_tracker_role_str[] = {
+    "/user/vive_tracker_htcx/role/handheld_object", "/user/vive_tracker_htcx/role/left_foot",
+    "/user/vive_tracker_htcx/role/right_foot",      "/user/vive_tracker_htcx/role/left_shoulder",
+    "/user/vive_tracker_htcx/role/right_shoulder",  "/user/vive_tracker_htcx/role/left_elbow",
+    "/user/vive_tracker_htcx/role/right_elbow",     "/user/vive_tracker_htcx/role/left_knee",
+    "/user/vive_tracker_htcx/role/right_knee",      "/user/vive_tracker_htcx/role/waist",
+    "/user/vive_tracker_htcx/role/chest",           "/user/vive_tracker_htcx/role/camera",
+    "/user/vive_tracker_htcx/role/keyboard",
+};
+#define VIVE_TRACKER_ROLE_COUNT (sizeof(vive_tracker_role_str) / sizeof(vive_tracker_role_str[0]))
+
+struct known_vive_tracker
+{
+	XrPath persistent_path;
+	XrPath role_path;
+
+	char* role_str;
+
+	// pointing to the pre-created per-role action. NULL if role_PATH == XR_NULL_PATH.
+	struct action_t action;
+
+	struct known_vive_tracker* next;
+};
+
+struct vive_tracker_t
+{
+	struct base_extension_t base;
+
+	// dynamic list of trackers
+	struct known_vive_tracker* trackers;
+
+	PFN_xrEnumerateViveTrackerPathsHTCX pfnxrEnumerateViveTrackerPathsHTCX;
+};
+
 struct ext_t
 {
 	struct opengl_t opengl;
@@ -700,6 +805,8 @@ struct ext_t
 
 	struct hand_tracking_t hand_tracking;
 	struct refresh_rate_t refresh_rate;
+
+	struct vive_tracker_t vive_tracker;
 };
 
 struct OpenXRState
@@ -727,23 +834,11 @@ struct OpenXRState
 	XrViewState view_state;
 };
 
-struct action_t
-{
-	XrAction action;
-	XrActionType action_type;
-	union {
-		XrActionStateFloat float_;
-		XrActionStateBoolean boolean_;
-		XrActionStatePose pose_;
-		XrActionStateVector2f vec2f_;
-	} states[HAND_COUNT];
-	XrSpace pose_spaces[HAND_COUNT];
-	XrSpaceLocation pose_locations[HAND_COUNT];
-	XrSpaceVelocity pose_velocities[HAND_COUNT];
-};
-
 struct ApplicationState
 {
+	// have to define the names somewhere
+	struct ext_t ext;
+
 	struct OpenXRState oxr;
 
 	// use optional XrSpaceVelocity in xrLocateSpace for controllers and visualize linear velocity
@@ -786,6 +881,72 @@ struct ApplicationState
 
 	struct gl_renderer_t gl_renderer;
 };
+
+static char*
+create_name_from_path(char* path)
+{
+	char* name = strdup(path);
+	char* ptr = name;
+	while (*ptr != '\0') {
+		if (*ptr == '/') {
+			*ptr = '_';
+		}
+		ptr++;
+	}
+	return name;
+}
+
+static bool
+create_vive_role_trackers(XrInstance instance,
+                          XrSession session,
+                          struct ext_t* ext,
+                          XrActionSet actionset)
+{
+	if (!ext->vive_tracker.base.supported) {
+		return XR_SUCCESS;
+	}
+
+	struct known_vive_tracker* curr_tracker = NULL;
+	for (uint32_t i = 0; i < VIVE_TRACKER_ROLE_COUNT; i++) {
+
+		struct known_vive_tracker* next_tracker = calloc(1, sizeof(struct known_vive_tracker));
+		next_tracker->action =
+		    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
+		next_tracker->role_path = XR_NULL_PATH;
+		next_tracker->role_str = (char*)vive_tracker_role_str[i];
+
+
+		XrResult result = xrStringToPath(instance, next_tracker->role_str, &next_tracker->role_path);
+		if (!xr_check(instance, result, "Failed to get XrPath for role %s!", next_tracker->role_path)) {
+			return false;
+		}
+
+		// frowned upon but do it anyway
+		char* name = create_name_from_path(next_tracker->role_str);
+		printf("Create action name %s with subaction path %s | %lu\n", name, next_tracker->role_str,
+		       next_tracker->role_path);
+
+		if (!create_action(instance, XR_ACTION_TYPE_POSE_INPUT, name, name, actionset, 1,
+		                   &next_tracker->role_path, &next_tracker->action)) {
+			free(name);
+			return false;
+		}
+		free(name);
+
+		if (!create_action_space(instance, session, &next_tracker->action, &next_tracker->role_path)) {
+			return false;
+		}
+
+		if (curr_tracker == NULL) {
+			ext->vive_tracker.trackers = next_tracker;
+		} else {
+			curr_tracker->next = next_tracker;
+		}
+		curr_tracker = next_tracker;
+	}
+
+	return true;
+}
 
 
 #define LOAD_OR_RETURN(NAME, LOCATION)                                                             \
@@ -877,10 +1038,32 @@ _check_extensions(struct ApplicationState* app, struct ext_t* ext)
 	_check_extension_support(&ext->opengl.base, ext_props, ext_count);
 	_check_extension_support(&ext->hand_tracking.base, ext_props, ext_count);
 	_check_extension_support(&ext->refresh_rate.base, ext_props, ext_count);
+	_check_extension_support(&ext->vive_tracker.base, ext_props, ext_count);
 
 	free(ext_props);
 	return XR_SUCCESS;
 }
+
+static XrResult
+_init_vive_tracker_ext(XrInstance instance, struct ext_t* ext)
+{
+	if (!ext->vive_tracker.base.supported) {
+		return XR_SUCCESS;
+	}
+
+	ext->vive_tracker.trackers = NULL;
+
+	XrResult result;
+	result = xrGetInstanceProcAddr(
+	    instance, "xrEnumerateViveTrackerPathsHTCX",
+	    (PFN_xrVoidFunction*)&ext->vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX);
+	if (!xr_check(instance, result, "Failed to get xrEnumerateViveTrackerPathsHTCX function!")) {
+		return result;
+	}
+
+	return XR_SUCCESS;
+}
+
 
 static XrResult
 _init_extensions(XrInstance instance, struct ext_t* ext)
@@ -899,6 +1082,11 @@ _init_extensions(XrInstance instance, struct ext_t* ext)
 
 	result = _init_refresh_rate_ext(instance, ext);
 	if (!xr_check(instance, result, "Failed to init fb refresh reate ext")) {
+		return result;
+	}
+
+	result = _init_vive_tracker_ext(instance, ext);
+	if (!xr_check(instance, result, "Failed to init vive tracker ext")) {
 		return result;
 	}
 
@@ -1053,30 +1241,6 @@ destroy_swapchain(struct swapchain_t* swapchain)
 }
 
 
-bool
-create_action(XrInstance instance,
-              XrActionType type,
-              char* name,
-              char* localized_name,
-              XrActionSet set,
-              int subaction_count,
-              XrPath* subactions,
-              XrAction* out_action)
-{
-	XrActionCreateInfo actionInfo = {.type = XR_TYPE_ACTION_CREATE_INFO,
-	                                 .actionType = type,
-	                                 .countSubactionPaths = subaction_count,
-	                                 .subactionPaths = subactions};
-	strcpy(actionInfo.actionName, name);
-	strcpy(actionInfo.localizedActionName, localized_name);
-
-	XrResult result = xrCreateAction(set, &actionInfo, out_action);
-	if (!xr_check(instance, result, "Failed to create action %s", name))
-		return false;
-
-	return true;
-}
-
 struct Binding
 {
 	XrAction action;
@@ -1135,93 +1299,77 @@ suggest_actions(XrInstance instance, char* profile, struct Binding* b, int bindi
 	return true;
 }
 
-bool
-create_action_space(XrInstance instance,
-                    XrSession session,
-                    struct action_t* action,
-                    XrPath* hand_paths)
-{
-	// poses can't be queried directly, we need to create a space for each
-	for (int hand = 0; hand < HAND_COUNT; hand++) {
-		XrActionSpaceCreateInfo action_space_info = {.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
-		                                             .next = NULL,
-		                                             .action = action->action,
-		                                             .poseInActionSpace = identity_pose,
-		                                             .subactionPath = hand_paths[hand]};
 
+bool
+update_action_data(XrInstance instance,
+                   XrSession session,
+                   struct action_t* action,
+                   XrSpace space,
+                   XrTime time,
+                   bool velocities)
+{
+	for (uint32_t subaction_path_idx = 0; subaction_path_idx < action->subaction_path_count;
+	     subaction_path_idx++) {
+
+		XrActionStateGetInfo info = {
+		    .type = XR_TYPE_ACTION_STATE_GET_INFO,
+		    .next = NULL,
+		    .action = action->action,
+		    .subactionPath = action->subaction_paths[subaction_path_idx],
+		};
 		XrResult result;
-		result = xrCreateActionSpace(session, &action_space_info, &action->pose_spaces[hand]);
-		if (!xr_check(instance, result, "failed to create hand %d pose space", hand))
-			return false;
-	}
-	return true;
-}
-
-bool
-get_action_data(XrInstance instance,
-                XrSession session,
-                struct action_t* action,
-                int hand,
-                XrPath* subaction_paths,
-                XrSpace space,
-                XrTime time,
-                bool velocities)
-{
-	XrActionStateGetInfo info = {
-	    .type = XR_TYPE_ACTION_STATE_GET_INFO,
-	    .next = NULL,
-	    .action = action->action,
-	    .subactionPath = subaction_paths[hand],
-	};
-	XrResult result;
-	if (action->action_type == XR_ACTION_TYPE_FLOAT_INPUT) {
-		action->states[hand].float_.type = XR_TYPE_ACTION_STATE_FLOAT;
-		action->states[hand].float_.next = NULL;
-		result = xrGetActionStateFloat(session, &info, &action->states[hand].float_);
-		if (!xr_check(instance, result, "Failed to get float"))
-			return false;
-	}
-	if (action->action_type == XR_ACTION_TYPE_BOOLEAN_INPUT) {
-		action->states[hand].boolean_.type = XR_TYPE_ACTION_STATE_BOOLEAN;
-		action->states[hand].boolean_.next = NULL;
-		result = xrGetActionStateBoolean(session, &info, &action->states[hand].boolean_);
-		if (!xr_check(instance, result, "Failed to get bool"))
-			return false;
-	}
-	if (action->action_type == XR_ACTION_TYPE_VECTOR2F_INPUT) {
-		action->states[hand].vec2f_.type = XR_TYPE_ACTION_STATE_VECTOR2F;
-		action->states[hand].vec2f_.next = NULL;
-		result = xrGetActionStateVector2f(session, &info, &action->states[hand].vec2f_);
-		if (!xr_check(instance, result, "Failed to get vec2f"))
-			return false;
-	}
-	if (action->action_type == XR_ACTION_TYPE_POSE_INPUT) {
-		action->states[hand].pose_.type = XR_TYPE_ACTION_STATE_POSE;
-		action->states[hand].pose_.next = NULL;
-		result = xrGetActionStatePose(session, &info, &action->states[hand].pose_);
-		if (!xr_check(instance, result, "Failed to get action state pose"))
-			return false;
-
-		if (action->states[hand].pose_.isActive) {
-			action->pose_locations[hand].type = XR_TYPE_SPACE_LOCATION;
-			action->pose_locations[hand].next = NULL;
-
-			if (velocities) {
-				action->pose_velocities[hand].type = XR_TYPE_SPACE_VELOCITY;
-				action->pose_velocities[hand].next = NULL;
-				action->pose_locations[hand].next = &action->pose_velocities[hand];
-			} else {
-				action->pose_locations[hand].next = NULL;
-			}
-
-			result = xrLocateSpace(action->pose_spaces[hand], space, time, &action->pose_locations[hand]);
-			if (!xr_check(instance, result, "Failed to locate hand space"))
+		if (action->action_type == XR_ACTION_TYPE_FLOAT_INPUT) {
+			action->states[subaction_path_idx].float_.type = XR_TYPE_ACTION_STATE_FLOAT;
+			action->states[subaction_path_idx].float_.next = NULL;
+			result = xrGetActionStateFloat(session, &info, &action->states[subaction_path_idx].float_);
+			if (!xr_check(instance, result, "Failed to get float"))
 				return false;
 		}
-	}
+		if (action->action_type == XR_ACTION_TYPE_BOOLEAN_INPUT) {
+			action->states[subaction_path_idx].boolean_.type = XR_TYPE_ACTION_STATE_BOOLEAN;
+			action->states[subaction_path_idx].boolean_.next = NULL;
+			result =
+			    xrGetActionStateBoolean(session, &info, &action->states[subaction_path_idx].boolean_);
+			if (!xr_check(instance, result, "Failed to get bool"))
+				return false;
+		}
+		if (action->action_type == XR_ACTION_TYPE_VECTOR2F_INPUT) {
+			action->states[subaction_path_idx].vec2f_.type = XR_TYPE_ACTION_STATE_VECTOR2F;
+			action->states[subaction_path_idx].vec2f_.next = NULL;
+			result = xrGetActionStateVector2f(session, &info, &action->states[subaction_path_idx].vec2f_);
+			if (!xr_check(instance, result, "Failed to get vec2f"))
+				return false;
+		}
+		if (action->action_type == XR_ACTION_TYPE_POSE_INPUT) {
+			action->states[subaction_path_idx].pose_.type = XR_TYPE_ACTION_STATE_POSE;
+			action->states[subaction_path_idx].pose_.next = NULL;
+			result = xrGetActionStatePose(session, &info, &action->states[subaction_path_idx].pose_);
+			if (!xr_check(instance, result, "Failed to get action state pose"))
+				return false;
 
-	if (!xr_check(instance, result, "Failed to get action state")) {
-		return false;
+			if (action->states[subaction_path_idx].pose_.isActive) {
+				action->pose_locations[subaction_path_idx].type = XR_TYPE_SPACE_LOCATION;
+				action->pose_locations[subaction_path_idx].next = NULL;
+
+				if (velocities) {
+					action->pose_velocities[subaction_path_idx].type = XR_TYPE_SPACE_VELOCITY;
+					action->pose_velocities[subaction_path_idx].next = NULL;
+					action->pose_locations[subaction_path_idx].next =
+					    &action->pose_velocities[subaction_path_idx];
+				} else {
+					action->pose_locations[subaction_path_idx].next = NULL;
+				}
+
+				result = xrLocateSpace(action->pose_spaces[subaction_path_idx], space, time,
+				                       &action->pose_locations[subaction_path_idx]);
+				if (!xr_check(instance, result, "Failed to locate hand space"))
+					return false;
+			}
+		}
+
+		if (!xr_check(instance, result, "Failed to get action state")) {
+			return false;
+		}
 	}
 
 	return true;
@@ -1399,6 +1547,14 @@ int
 main(int argc, char** argv)
 {
 	struct ApplicationState app = {
+	    .ext =
+	        {
+	            .opengl.base.ext_name_string = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
+	            .depth.base.ext_name_string = XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+	            .hand_tracking.base.ext_name_string = XR_EXT_HAND_TRACKING_EXTENSION_NAME,
+	            .refresh_rate.base.ext_name_string = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME,
+	            .vive_tracker.base.ext_name_string = XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME,
+	        },
 	    .oxr =
 	        {
 	            .form_factor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
@@ -1436,42 +1592,42 @@ main(int argc, char** argv)
 	struct quad_layer_t quad_layer = {.pixel_width = 320, .pixel_height = 240};
 
 	XrPath hand_paths[HAND_COUNT];
+	XrPath hand_interaction_profile[HAND_COUNT] = {0};
 
-	// have to define the names somewhere
-	struct ext_t ext = {
-	    .opengl.base.ext_name_string = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
-	    .depth.base.ext_name_string = XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-	    .hand_tracking.base.ext_name_string = XR_EXT_HAND_TRACKING_EXTENSION_NAME,
-	    .refresh_rate.base.ext_name_string = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME,
-	};
+	XrPath vive_tracker_interaction_profile[VIVE_TRACKER_ROLE_COUNT] = {0};
 
 	// reuse this variable for all our OpenXR return codes
 	XrResult result = XR_SUCCESS;
 
 
-	result = _check_extensions(&app, &ext);
+	result = _check_extensions(&app, &app.ext);
 	if (!xr_check(app.oxr.instance, result, "Extensions check failed!")) {
 		return 1;
 	}
-	if (!ext.opengl.base.supported) {
-		printf("%s is required\n", ext.opengl.base.ext_name_string);
+	if (!app.ext.opengl.base.supported) {
+		printf("%s is required\n", app.ext.opengl.base.ext_name_string);
 		return 1;
 	};
 
 
 	// --- Create XrInstance
 	int enabled_ext_count = 1;
-	const char* enabled_exts[6] = {ext.opengl.base.ext_name_string};
-	printf("enabling extension %s\n", ext.opengl.base.ext_name_string);
+	const char* enabled_exts[6] = {app.ext.opengl.base.ext_name_string};
+	printf("enabling extension %s\n", app.ext.opengl.base.ext_name_string);
 
-	if (ext.hand_tracking.base.supported) {
-		enabled_exts[enabled_ext_count++] = ext.hand_tracking.base.ext_name_string;
-		printf("enabling extension %s\n", ext.hand_tracking.base.ext_name_string);
+	if (app.ext.hand_tracking.base.supported) {
+		enabled_exts[enabled_ext_count++] = app.ext.hand_tracking.base.ext_name_string;
+		printf("enabling extension %s\n", app.ext.hand_tracking.base.ext_name_string);
 	}
 
-	if (ext.refresh_rate.base.supported) {
-		enabled_exts[enabled_ext_count++] = ext.refresh_rate.base.ext_name_string;
-		printf("enabling extension %s\n", ext.refresh_rate.base.ext_name_string);
+	if (app.ext.refresh_rate.base.supported) {
+		enabled_exts[enabled_ext_count++] = app.ext.refresh_rate.base.ext_name_string;
+		printf("enabling extension %s\n", app.ext.refresh_rate.base.ext_name_string);
+	}
+
+	if (app.ext.vive_tracker.base.supported) {
+		enabled_exts[enabled_ext_count++] = app.ext.vive_tracker.base.ext_name_string;
+		printf("enabling extension %s\n", app.ext.vive_tracker.base.ext_name_string);
 	}
 
 	// same can be done for API layers, but API layers can also be enabled by env var
@@ -1502,7 +1658,7 @@ main(int argc, char** argv)
 	if (!xr_check(NULL, result, "Failed to create XR instance."))
 		return 1;
 
-	result = _init_extensions(app.oxr.instance, &ext);
+	result = _init_extensions(app.oxr.instance, &app.ext);
 	if (!xr_check(app.oxr.instance, result, "Failed to init extensions!")) {
 		return 1;
 	}
@@ -1533,7 +1689,7 @@ main(int argc, char** argv)
 
 		XrSystemHandTrackingPropertiesEXT ht = {.type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
 		                                        .next = NULL};
-		if (ext.hand_tracking.base.supported) {
+		if (app.ext.hand_tracking.base.supported) {
 			system_props.next = &ht;
 		}
 
@@ -1541,8 +1697,8 @@ main(int argc, char** argv)
 		if (!xr_check(app.oxr.instance, result, "Failed to get System properties"))
 			return 1;
 
-		ext.hand_tracking.system_supported =
-		    ext.hand_tracking.base.supported && ht.supportsHandTracking;
+		app.ext.hand_tracking.system_supported =
+		    app.ext.hand_tracking.base.supported && ht.supportsHandTracking;
 
 		print_system_properties(&system_props);
 	}
@@ -1577,8 +1733,8 @@ main(int argc, char** argv)
 	                                               .next = NULL};
 
 	// this function pointer was loaded with xrGetInstanceProcAddr
-	result = ext.opengl.xrGetOpenGLGraphicsRequirementsKHR(app.oxr.instance, app.oxr.system_id,
-	                                                       &opengl_reqs);
+	result = app.ext.opengl.xrGetOpenGLGraphicsRequirementsKHR(app.oxr.instance, app.oxr.system_id,
+	                                                           &opengl_reqs);
 	if (!xr_check(app.oxr.instance, result, "Failed to get OpenGL graphics requirements!"))
 		return 1;
 
@@ -1757,9 +1913,9 @@ main(int argc, char** argv)
 	    get_swapchain_format(app.oxr.instance, app.oxr.session, GL_DEPTH_COMPONENT16, false);
 	if (depth_format < 0) {
 		printf("Preferred depth format GL_DEPTH_COMPONENT16 not supported, disabling depth\n");
-		ext.depth.base.supported = false;
+		app.ext.depth.base.supported = false;
 	} else {
-		ext.depth.base.supported = true;
+		app.ext.depth.base.supported = true;
 	}
 
 	XrSwapchainUsageFlags color_flags =
@@ -1769,7 +1925,7 @@ main(int argc, char** argv)
 	                                 color_format, app.oxr.viewconfig_views, color_flags))
 		return 1;
 
-	if (ext.depth.base.supported) {
+	if (app.ext.depth.base.supported) {
 		XrSwapchainUsageFlags depth_flags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		if (!create_swapchain_from_views(app.oxr.instance, app.oxr.session,
 		                                 &vr_swapchains[SWAPCHAIN_DEPTH], app.oxr.view_count,
@@ -1807,43 +1963,43 @@ main(int argc, char** argv)
 	};
 
 
-	if (ext.depth.base.supported) {
-		ext.depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
+	if (app.ext.depth.base.supported) {
+		app.ext.depth.infos = (XrCompositionLayerDepthInfoKHR*)malloc(
 		    sizeof(XrCompositionLayerDepthInfoKHR) * app.oxr.view_count);
 		for (uint32_t i = 0; i < app.oxr.view_count; i++) {
-			ext.depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
-			ext.depth.infos[i].next = NULL;
-			ext.depth.infos[i].minDepth = 0.f;
-			ext.depth.infos[i].maxDepth = 1.f;
-			ext.depth.infos[i].nearZ = app.gl_renderer.near_z;
-			ext.depth.infos[i].farZ = app.gl_renderer.far_z;
+			app.ext.depth.infos[i].type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR;
+			app.ext.depth.infos[i].next = NULL;
+			app.ext.depth.infos[i].minDepth = 0.f;
+			app.ext.depth.infos[i].maxDepth = 1.f;
+			app.ext.depth.infos[i].nearZ = app.gl_renderer.near_z;
+			app.ext.depth.infos[i].farZ = app.gl_renderer.far_z;
 
-			ext.depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
+			app.ext.depth.infos[i].subImage.swapchain = vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i];
 
-			ext.depth.infos[i].subImage.imageArrayIndex = 0;
-			ext.depth.infos[i].subImage.imageRect.offset.x = 0;
-			ext.depth.infos[i].subImage.imageRect.offset.y = 0;
-			ext.depth.infos[i].subImage.imageRect.extent.width =
+			app.ext.depth.infos[i].subImage.imageArrayIndex = 0;
+			app.ext.depth.infos[i].subImage.imageRect.offset.x = 0;
+			app.ext.depth.infos[i].subImage.imageRect.offset.y = 0;
+			app.ext.depth.infos[i].subImage.imageRect.extent.width =
 			    app.oxr.viewconfig_views[i].recommendedImageRectWidth;
-			ext.depth.infos[i].subImage.imageRect.extent.height =
+			app.ext.depth.infos[i].subImage.imageRect.extent.height =
 			    app.oxr.viewconfig_views[i].recommendedImageRectHeight;
 
-			app.oxr.projection_views[i].next = &ext.depth.infos[i];
+			app.oxr.projection_views[i].next = &app.ext.depth.infos[i];
 		};
 	}
 
 
 	// get info from fb_refresh_rate
-	if (ext.refresh_rate.base.supported) {
+	if (app.ext.refresh_rate.base.supported) {
 		uint32_t refresh_rate_count;
-		result = ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(app.oxr.session, 0,
-		                                                           &refresh_rate_count, NULL);
+		result = app.ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(app.oxr.session, 0,
+		                                                               &refresh_rate_count, NULL);
 		if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rate count"))
 			return 1;
 
 		if (refresh_rate_count > 0) {
 			float* refresh_rates = malloc(sizeof(float) * refresh_rate_count);
-			result = ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(
+			result = app.ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(
 			    app.oxr.session, refresh_rate_count, &refresh_rate_count, refresh_rates);
 			if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rates")) {
 				free(refresh_rates);
@@ -1857,7 +2013,7 @@ main(int argc, char** argv)
 
 			// refresh rates are ordered lowest to highest
 			printf("Requesting refresh rate %f\n", refresh_rates[refresh_rate_count - 1]);
-			result = ext.refresh_rate.xrRequestDisplayRefreshRateFB(
+			result = app.ext.refresh_rate.xrRequestDisplayRefreshRateFB(
 			    app.oxr.session, refresh_rates[refresh_rate_count - 1]);
 			if (!xr_check(app.oxr.instance, result, "failed to request refresh rate %f",
 			              refresh_rates[refresh_rate_count - 1]))
@@ -1867,7 +2023,7 @@ main(int argc, char** argv)
 		}
 
 		float refresh_rate = 0;
-		result = ext.refresh_rate.xrGetDisplayRefreshRateFB(app.oxr.session, &refresh_rate);
+		result = app.ext.refresh_rate.xrGetDisplayRefreshRateFB(app.oxr.session, &refresh_rate);
 		if (!xr_check(app.oxr.instance, result, "failed to get refresh rate"))
 			return 1;
 
@@ -1876,7 +2032,6 @@ main(int argc, char** argv)
 
 
 	// --- Set up input (actions)
-
 	xrStringToPath(app.oxr.instance, "/user/hand/left", &hand_paths[HAND_LEFT_INDEX]);
 	xrStringToPath(app.oxr.instance, "/user/hand/right", &hand_paths[HAND_RIGHT_INDEX]);
 
@@ -1895,7 +2050,7 @@ main(int argc, char** argv)
 	app.grab_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "grabobjectfloat", "Grab Object",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.grab_action.action))
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.grab_action))
 		return 1;
 
 
@@ -1903,13 +2058,13 @@ main(int argc, char** argv)
 	app.accelerate_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "accelerate", "Accelerate",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.accelerate_action.action))
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.accelerate_action))
 		return 1;
 
 	app.hand_pose_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "handpose", "Hand Pose",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.hand_pose_action.action))
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.hand_pose_action))
 		return 1;
 	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.hand_pose_action, hand_paths))
 		return 1;
@@ -1917,7 +2072,7 @@ main(int argc, char** argv)
 	app.aim_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "aim", "Aim Pose",
-	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.aim_action.action))
+	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.aim_action))
 		return 1;
 	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.aim_action, hand_paths))
 		return 1;
@@ -1926,8 +2081,43 @@ main(int argc, char** argv)
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_VIBRATION_OUTPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic",
 	                   "Haptic Vibration", gameplay_actionset, HAND_COUNT, hand_paths,
-	                   &app.haptic_action.action))
+	                   &app.haptic_action))
 		return 1;
+
+
+	// create an action for each role path regardless if we know a tracker with it yet
+	// because actions have to be created before the action set is attached to the session
+	if (!create_vive_role_trackers(app.oxr.instance, app.oxr.session, &app.ext, gameplay_actionset)) {
+		return 1;
+	}
+
+	{
+		// temp arrays for holding binding suggestion data
+		struct Binding vive_tracker_bindings[VIVE_TRACKER_ROLE_COUNT];
+		char path_strs[VIVE_TRACKER_ROLE_COUNT][XR_MAX_PATH_LENGTH];
+
+
+		struct known_vive_tracker* t = app.ext.vive_tracker.trackers;
+		int i = 0;
+		while (t) {
+			char* path_str = path_strs[i];
+			snprintf(path_str, XR_MAX_PATH_LENGTH, "%s/input/grip/pose", t->role_str);
+
+			vive_tracker_bindings[i] = (struct Binding){
+			    .action = t->action.action,
+			    .paths = {path_str},
+			    .path_count = 1,
+			};
+
+			t = t->next;
+			i++;
+		};
+
+		if (!suggest_actions(app.oxr.instance, "/interaction_profiles/htc/vive_tracker_htcx",
+		                     vive_tracker_bindings, ARRAY_SIZE(vive_tracker_bindings)))
+			return 1;
+	}
+
 
 
 	struct Binding simple_bindings[] = {
@@ -2007,10 +2197,65 @@ main(int argc, char** argv)
 	                     ARRAY_SIZE(vive_bindings)))
 		return 1;
 
-	if (ext.hand_tracking.system_supported) {
-		if (!create_hand_trackers(app.oxr.instance, app.oxr.session, &ext.hand_tracking))
+	if (app.ext.hand_tracking.system_supported) {
+		if (!create_hand_trackers(app.oxr.instance, app.oxr.session, &app.ext.hand_tracking))
 			return 1;
 	}
+
+
+
+	// TODO: this doesn't enumerate anything at startup, it only starts enumerating later (after
+	// rendering one frame?)
+	printf("Enumerating vive trackers\n");
+	uint32_t vive_tracker_path_count = 0;
+	XrViveTrackerPathsHTCX* vive_tracker_paths = NULL;
+	if (app.ext.vive_tracker.base.supported) {
+		result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
+		    app.oxr.instance, 0, &vive_tracker_path_count, NULL);
+		if (!xr_check(app.oxr.instance, result, "failed to get vive tracker path count")) {
+			return 1;
+		}
+
+		if (vive_tracker_path_count > 0) {
+			vive_tracker_paths = malloc(sizeof(XrViveTrackerPathsHTCX) * vive_tracker_path_count);
+			for (uint32_t i = 0; i < vive_tracker_path_count; i++) {
+				vive_tracker_paths[i].type = XR_TYPE_VIVE_TRACKER_PATHS_HTCX;
+				vive_tracker_paths[i].next = NULL;
+			}
+		}
+
+		result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
+		    app.oxr.instance, vive_tracker_path_count, &vive_tracker_path_count, vive_tracker_paths);
+		if (!xr_check(app.oxr.instance, result, "failed to get vive tracker paths")) {
+			return 1;
+		}
+
+		printf("%d Vive tracker paths: ", vive_tracker_path_count);
+		for (uint32_t i = 0; i < vive_tracker_path_count; i++) {
+			XrPath persistent = vive_tracker_paths[i].persistentPath;
+			XrPath role = vive_tracker_paths[i].rolePath;
+			char persistent_s[XR_MAX_PATH_LENGTH];
+			char role_s[XR_MAX_PATH_LENGTH];
+
+			uint32_t len = 0;
+			result = xrPathToString(app.oxr.instance, persistent, XR_MAX_PATH_LENGTH, &len, persistent_s);
+			if (!xr_check(app.oxr.instance, result, "failed to get vive tracker persistent path")) {
+				continue;
+			}
+			if (role == XR_NULL_PATH) {
+				strcpy(role_s, "<unassigned>");
+			} else {
+				result = xrPathToString(app.oxr.instance, role, XR_MAX_PATH_LENGTH, &len, role_s);
+				if (!xr_check(app.oxr.instance, result, "failed to get vive tracker role path")) {
+					continue;
+				}
+			}
+			printf("(Persistent: %s [%lu], Role: %s [%lu]), ", persistent_s, persistent, role_s, role);
+		}
+		printf("\n");
+	}
+
+
 
 	// TODO: should not be necessary, but is for SteamVR 1.16.4 (but not 1.15.x)
 	glXMakeCurrent(graphics_binding_gl.xDisplay, graphics_binding_gl.glxDrawable,
@@ -2062,6 +2307,7 @@ main(int argc, char** argv)
 		XrEventDataBuffer runtime_event = {.type = XR_TYPE_EVENT_DATA_BUFFER, .next = NULL};
 		XrResult poll_result = xrPollEvent(app.oxr.instance, &runtime_event);
 		while (poll_result == XR_SUCCESS) {
+
 			switch (runtime_event.type) {
 			case XR_TYPE_EVENT_DATA_EVENTS_LOST: {
 				XrEventDataEventsLost* event = (XrEventDataEventsLost*)&runtime_event;
@@ -2169,7 +2415,15 @@ main(int argc, char** argv)
 						continue;
 
 					XrPath prof = state.interactionProfile;
+					bool changed = hand_interaction_profile[i] != prof;
+					hand_interaction_profile[i] = prof;
 
+					if (prof == XR_NULL_PATH) {
+						if (changed) {
+							printf("EVENT: Interaction profile for %d is now XR_NULL_PATH\n", i);
+						}
+						continue;
+					}
 					uint32_t strl;
 					char profile_str[XR_MAX_PATH_LENGTH];
 					res = xrPathToString(app.oxr.instance, prof, XR_MAX_PATH_LENGTH, &strl, profile_str);
@@ -2177,8 +2431,57 @@ main(int argc, char** argv)
 					              i))
 						continue;
 
-					printf("Event: Interaction profile changed for %d: %s\n", i, profile_str);
+					if (changed) {
+						printf("EVENT: Interaction profile changed for %d: %s\n", i, profile_str);
+					}
 				}
+
+
+
+				// TODO: make function
+				if (app.ext.vive_tracker.base.supported) {
+					for (uint32_t i = 0; i < VIVE_TRACKER_ROLE_COUNT; i++) {
+
+						XrPath role_path;
+						result = xrStringToPath(app.oxr.instance, vive_tracker_role_str[i], &role_path);
+						if (!xr_check(app.oxr.instance, result, "failed to get vive tracker role path")) {
+							return 1;
+						}
+
+						XrResult res = xrGetCurrentInteractionProfile(app.oxr.session, role_path, &state);
+						if (!xr_check(app.oxr.instance, res, "Failed to get interaction profile for %s",
+						              vive_tracker_role_str[i]))
+							continue;
+
+						XrPath prof = state.interactionProfile;
+						bool changed = vive_tracker_interaction_profile[i] != prof;
+						vive_tracker_interaction_profile[i] = prof;
+
+						if (prof == XR_NULL_PATH) {
+							if (changed) {
+								printf("EVENT: Interaction profile for %s is now XR_NULL_PATH\n",
+								       vive_tracker_role_str[i]);
+							}
+							continue;
+						}
+
+						uint32_t strl;
+						char profile_str[XR_MAX_PATH_LENGTH];
+						res = xrPathToString(app.oxr.instance, prof, XR_MAX_PATH_LENGTH, &strl, profile_str);
+						if (!xr_check(app.oxr.instance, res,
+						              "Failed to get interaction profile path str for %s",
+						              vive_tracker_role_str[i]))
+							continue;
+
+						if (vive_tracker_interaction_profile[i] != prof) {
+							printf("EVENT: Interaction profile changed for %d: %s\n", i, profile_str);
+							vive_tracker_interaction_profile[i] = prof;
+						}
+					}
+				}
+
+
+
 				// TODO: do something
 				break;
 			}
@@ -2198,6 +2501,115 @@ main(int argc, char** argv)
 				// this event is from an extension
 				break;
 			}
+
+			case XR_TYPE_EVENT_DATA_VIVE_TRACKER_CONNECTED_HTCX: {
+				XrEventDataViveTrackerConnectedHTCX* event =
+				    (XrEventDataViveTrackerConnectedHTCX*)&runtime_event;
+				char persistent_str[XR_MAX_PATH_LENGTH];
+				uint32_t persistent_len = 0;
+				XrResult res = xrPathToString(app.oxr.instance, event->paths->persistentPath,
+				                              XR_MAX_PATH_LENGTH, &persistent_len, persistent_str);
+				if (!xr_check(app.oxr.instance, res, "Failed to get vive tracker persistent path string %d",
+				              event->paths->persistentPath))
+					continue;
+
+				char event_role_str[XR_MAX_PATH_LENGTH];
+				uint32_t event_role_len = 0;
+				res = xrPathToString(app.oxr.instance, event->paths->rolePath, XR_MAX_PATH_LENGTH,
+				                     &event_role_len, event_role_str);
+				if (!xr_check(app.oxr.instance, res, "Failed to get vive tracker role path string %d",
+				              event->paths->rolePath))
+					continue;
+
+				printf("EVENT: vive tracker connected: %s -> role %lu %s!\n", persistent_str,
+				       event->paths->rolePath, event_role_str);
+
+				// check if we already know the tracker (we always know all roles) and print some info if we
+				// do
+
+				struct known_vive_tracker* t = app.ext.vive_tracker.trackers;
+				struct known_vive_tracker* matching_role = NULL;
+				struct known_vive_tracker* matching_persistent_path = NULL;
+
+
+				while (t) {
+					if (t->persistent_path == event->paths->persistentPath) {
+						matching_persistent_path = t;
+						printf("Tracker was already known by its persistent path %s\n", persistent_str);
+					}
+					if ((t->role_path != XR_NULL_PATH) && (t->role_path == event->paths->rolePath)) {
+						printf("Connected tracker has role %s\n", t->role_str);
+						matching_role = t;
+					}
+
+					t = t->next;
+				}
+
+				if (matching_persistent_path) {
+					if (matching_persistent_path->role_path != event->paths->rolePath) {
+						char prev_role_str[XR_MAX_PATH_LENGTH];
+						if (event->paths->rolePath == XR_NULL_PATH) {
+							snprintf(prev_role_str, XR_MAX_PATH_LENGTH, "XR_NULL_PATH");
+						} else {
+							uint32_t prev_role_len;
+							char prev_role_str[XR_MAX_PATH_LENGTH];
+							// if fails, will have already so the first time we got the role path
+							xrPathToString(app.oxr.instance, t->role_path, XR_MAX_PATH_LENGTH, &prev_role_len,
+							               prev_role_str);
+							printf("%s\n", prev_role_str);
+						}
+						printf("Tracker we already knew by persistent path changed its role. %s -> %s\n",
+						       prev_role_str, event_role_str);
+						matching_persistent_path->role_path = event->paths->rolePath;
+						matching_persistent_path->role_str = event_role_str;
+					} else {
+						printf(
+						    "Tracker we already knew by persistent path didn't change role. Nothing to do.\n");
+					}
+				}
+
+				if (matching_role) {
+					printf("Connected tracker had role %s\n", event_role_str);
+					if (matching_role->persistent_path != event->paths->persistentPath) {
+						char prev_persistent_str[XR_MAX_PATH_LENGTH];
+						if (matching_role->persistent_path == XR_NULL_PATH) {
+							snprintf(prev_persistent_str, XR_MAX_PATH_LENGTH, "XR_NULL_PATH");
+						} else {
+							uint32_t prev_persistent_len;
+							char prev_persistent_str[XR_MAX_PATH_LENGTH];
+							xrPathToString(app.oxr.instance, t->role_path, XR_MAX_PATH_LENGTH,
+							               &prev_persistent_len, prev_persistent_str);
+						}
+						printf("Persistent path %s replaces previous persistent path %s\n", persistent_str,
+						       prev_persistent_str);
+						matching_role->persistent_path = event->paths->persistentPath;
+					}
+				}
+
+				// TODO: if it is a tracker we have not known, then add it
+
+				/*
+				struct known_vive_tracker *next_tracker = calloc(1, sizeof(struct known_vive_tracker));
+				next_tracker->action = (struct action_t) {.action = XR_NULL_HANDLE,
+				  .action_type = XR_ACTION_TYPE_POSE_INPUT};
+				  next_tracker->role_path = XR_NULL_PATH;
+				  */
+
+				if (event->paths->rolePath == XR_NULL_PATH) {
+					/* we don't support trackers with only persistent paths and no role. because actions can't
+					 * be created on the fly, we would have to either pre-create a fixed amount of generic
+					 * actions, or recreate the session every time a tracker without role is connected.
+					 */
+					printf("New tracker has no role, not supporting these kind of trackers for now\n");
+					continue;
+				} else {
+				}
+
+				// TODO: trackers with only persistent path
+			} break;
+
+
+
 			default: printf("Unhandled event type %d\n", runtime_event.type);
 			}
 
@@ -2258,24 +2670,93 @@ main(int argc, char** argv)
 		result = xrSyncActions(app.oxr.session, &actions_sync_info);
 		xr_check(app.oxr.instance, result, "failed to sync actions!");
 
+		struct known_vive_tracker* t = app.ext.vive_tracker.trackers;
+		while (t) {
+			if (!update_action_data(app.oxr.instance, app.oxr.session, &t->action, app.oxr.play_space,
+			                        frameState.predictedDisplayTime, false))
+				return 1;
+			if (t->action.states[0].pose_.isActive) {
+				// 				printf("Tracker with role %s: active %d %f, %f, %f\n", t->role_str,
+				// t->action.states[0].pose_.isActive, t->action.pose_locations[0].pose.position.x,
+				// 					 t->action.pose_locations[0].pose.position.y,
+				// 					 t->action.pose_locations[0].pose.position.z);
+			} else {
+				// printf("Tracker with role %s: active %d\n", t->role_str,
+				// t->action.states[0].pose_.isActive);
+			}
+			t = t->next;
+		}
+
+#if 0
+		printf("Enumerating vive trackers\n");
+		uint32_t vive_tracker_path_count = 0;
+		XrViveTrackerPathsHTCX* vive_tracker_paths = NULL;
+		if (app.ext.vive_tracker.base.supported) {
+			result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
+			    app.oxr.instance, 0, &vive_tracker_path_count, NULL);
+			if (!xr_check(app.oxr.instance, result, "failed to get vive tracker path count")) {
+				return 1;
+			}
+
+			if (vive_tracker_path_count > 0) {
+				vive_tracker_paths = malloc(sizeof(XrViveTrackerPathsHTCX) * vive_tracker_path_count);
+				for (uint32_t i = 0; i < vive_tracker_path_count; i++) {
+					vive_tracker_paths[i].type = XR_TYPE_VIVE_TRACKER_PATHS_HTCX;
+					vive_tracker_paths[i].next = NULL;
+				}
+			}
+
+			result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
+			    app.oxr.instance, vive_tracker_path_count, &vive_tracker_path_count, vive_tracker_paths);
+			if (!xr_check(app.oxr.instance, result, "failed to get vive tracker paths")) {
+				return 1;
+			}
+
+			printf("%d Vive tracker paths: ", vive_tracker_path_count);
+			for (uint32_t i = 0; i < vive_tracker_path_count; i++) {
+				XrPath persistent = vive_tracker_paths[i].persistentPath;
+				XrPath role = vive_tracker_paths[i].rolePath;
+				char persistent_s[XR_MAX_PATH_LENGTH];
+				char role_s[XR_MAX_PATH_LENGTH];
+
+				uint32_t len = 0;
+				result =
+				    xrPathToString(app.oxr.instance, persistent, XR_MAX_PATH_LENGTH, &len, persistent_s);
+				if (!xr_check(app.oxr.instance, result, "failed to get vive tracker persistent path")) {
+					continue;
+				}
+				if (role == XR_NULL_PATH) {
+					strcpy(role_s, "<unassigned>");
+				} else {
+					result = xrPathToString(app.oxr.instance, role, XR_MAX_PATH_LENGTH, &len, role_s);
+					if (!xr_check(app.oxr.instance, result, "failed to get vive tracker role path")) {
+						continue;
+					}
+				}
+				printf("(Persistent: %s [%lu], Role: %s [%lu]), ", persistent_s, persistent, role_s, role);
+			}
+			printf("\n");
+		}
+#endif
+
 		for (int i = 0; i < HAND_COUNT; i++) {
-			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.hand_pose_action, i, hand_paths,
-			                     app.oxr.play_space, frameState.predictedDisplayTime,
-			                     app.query_hand_velocities))
+			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.hand_pose_action,
+			                        app.oxr.play_space, frameState.predictedDisplayTime,
+			                        app.query_hand_velocities))
 				printf("Failed to get hand pose action data for hand %d\n", i);
 
-			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.aim_action, i, hand_paths,
-			                     app.oxr.play_space, frameState.predictedDisplayTime,
-			                     app.query_hand_velocities))
+			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.aim_action,
+			                        app.oxr.play_space, frameState.predictedDisplayTime,
+			                        app.query_hand_velocities))
 				printf("Failed to get aim pose action data for hand %d\n", i);
 
 
-			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.grab_action, i, hand_paths,
-			                     XR_NULL_HANDLE, 0, false))
+			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.grab_action, XR_NULL_HANDLE,
+			                        0, false))
 				printf("Failed to get grab action data for hand %d\n", i);
 
-			if (!get_action_data(app.oxr.instance, app.oxr.session, &app.accelerate_action, i, hand_paths,
-			                     XR_NULL_HANDLE, 0, false))
+			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.accelerate_action,
+			                        XR_NULL_HANDLE, 0, false))
 				printf("Failed to get accelerate action data for hand %d\n", i);
 
 
@@ -2306,9 +2787,9 @@ main(int argc, char** argv)
 				       app.accelerate_action.states[i].float_.currentState);
 			}
 
-			if (ext.hand_tracking.system_supported) {
+			if (app.ext.hand_tracking.system_supported) {
 				get_hand_tracking(app.oxr.instance, app.oxr.play_space, frameState.predictedDisplayTime,
-				                  app.query_joint_velocities, &ext.hand_tracking, i);
+				                  app.query_joint_velocities, &app.ext.hand_tracking, i);
 			}
 		};
 
@@ -2365,12 +2846,12 @@ main(int argc, char** argv)
 				break;
 
 			uint32_t depth_index = 0;
-			if (ext.depth.base.supported) {
+			if (app.ext.depth.base.supported) {
 				if (!acquire_swapchain(app.oxr.instance, &vr_swapchains[SWAPCHAIN_DEPTH], i, &depth_index))
 					break;
 			}
 
-			GLuint depth_image = ext.depth.base.supported
+			GLuint depth_image = app.ext.depth.base.supported
 			                         ? vr_swapchains[SWAPCHAIN_DEPTH].images[i][depth_index].image
 			                         : 0;
 			GLuint projection_image =
@@ -2384,15 +2865,15 @@ main(int argc, char** argv)
 			               graphics_binding_gl.glxContext);
 
 			render_frame(&app, w, h, &app.gl_renderer, projection_index, frameState.predictedDisplayTime,
-			             i, app.hand_pose_action.pose_locations, &ext.hand_tracking, &app.oxr.views[i],
-			             projection_image, ext.depth.base.supported, depth_image);
+			             i, app.hand_pose_action.pose_locations, &app.ext.hand_tracking,
+			             &app.oxr.views[i], projection_image, app.ext.depth.base.supported, depth_image);
 
 			result =
 			    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_PROJECTION].swapchains[i], &release_info);
 			if (!xr_check(app.oxr.instance, result, "failed to release swapchain image!"))
 				break;
 
-			if (ext.depth.base.supported) {
+			if (app.ext.depth.base.supported) {
 				result =
 				    xrReleaseSwapchainImage(vr_swapchains[SWAPCHAIN_DEPTH].swapchains[i], &release_info);
 				if (!xr_check(app.oxr.instance, result, "failed to release swapchain image!"))
@@ -2475,7 +2956,7 @@ main(int argc, char** argv)
 	// --- Clean up after render loop quits
 	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
 		free(vr_swapchains[SWAPCHAIN_PROJECTION].images[i]);
-		if (ext.depth.base.supported) {
+		if (app.ext.depth.base.supported) {
 			free(vr_swapchains[SWAPCHAIN_DEPTH].images[i]);
 		}
 
@@ -2493,7 +2974,7 @@ main(int argc, char** argv)
 	destroy_swapchain(&vr_swapchains[SWAPCHAIN_DEPTH]);
 	free(app.gl_renderer.framebuffers);
 
-	free(ext.depth.infos);
+	free(app.ext.depth.infos);
 
 	printf("Cleaned up!\n");
 }
@@ -3040,6 +3521,7 @@ render_frame(struct ApplicationState* app,
 		}
 	}
 
+
 	if (app->cube.enabled) {
 		if (app->cube.pos_ts != 0) {
 
@@ -3047,6 +3529,27 @@ render_frame(struct ApplicationState* app,
 			render_simple_cube(
 			    vec3(app->cube.current_pos.x, app->cube.current_pos.y, app->cube.current_pos.z),
 			    vec3(0.1, 0.1, 0.1), app->gl_renderer.modelLoc);
+		}
+	}
+
+	glUniform4f(app->gl_renderer.colorLoc, 0, 1, 1, 0.0);
+	if (app->ext.vive_tracker.base.supported) {
+		struct known_vive_tracker* t = app->ext.vive_tracker.trackers;
+		while (t) {
+			if (!t->action.states[0].pose_.isActive) {
+				t = t->next;
+				continue;
+			}
+			if ((t->action.pose_locations->locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) ==
+			    0) {
+				t = t->next;
+				continue;
+			}
+
+			XrVector3f scale = {.x = .075f, .y = .075f, .z = .075f};
+			render_block(&t->action.pose_locations[0].pose.position,
+			             &t->action.pose_locations[0].pose.orientation, &scale, gl_renderer->modelLoc);
+			t = t->next;
 		}
 	}
 
