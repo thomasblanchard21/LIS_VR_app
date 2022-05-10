@@ -2087,11 +2087,12 @@ main(int argc, char** argv)
 
 	// create an action for each role path regardless if we know a tracker with it yet
 	// because actions have to be created before the action set is attached to the session
-	if (!create_vive_role_trackers(app.oxr.instance, app.oxr.session, &app.ext, gameplay_actionset)) {
+	if (app.ext.vive_tracker.base.supported &&
+	    !create_vive_role_trackers(app.oxr.instance, app.oxr.session, &app.ext, gameplay_actionset)) {
 		return 1;
 	}
 
-	{
+	if (app.ext.vive_tracker.base.supported) {
 		// temp arrays for holding binding suggestion data
 		struct Binding vive_tracker_bindings[VIVE_TRACKER_ROLE_COUNT];
 		char path_strs[VIVE_TRACKER_ROLE_COUNT][XR_MAX_PATH_LENGTH];
