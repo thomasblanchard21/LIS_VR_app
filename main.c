@@ -692,19 +692,20 @@ bool
 create_action_space(XrInstance instance,
                     XrSession session,
                     struct action_t* action,
-                    XrPath* hand_paths)
+                    XrPath* subaction_paths,
+                    uint32_t subaction_path_count)
 {
 	// poses can't be queried directly, we need to create a space for each
-	for (int hand = 0; hand < HAND_COUNT; hand++) {
+	for (uint32_t i = 0; i < subaction_path_count; i++) {
 		XrActionSpaceCreateInfo action_space_info = {.type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
 		                                             .next = NULL,
 		                                             .action = action->action,
 		                                             .poseInActionSpace = identity_pose,
-		                                             .subactionPath = hand_paths[hand]};
+		                                             .subactionPath = subaction_paths[i]};
 
 		XrResult result;
-		result = xrCreateActionSpace(session, &action_space_info, &action->pose_spaces[hand]);
-		if (!xr_check(instance, result, "failed to create hand %d pose space", hand))
+		result = xrCreateActionSpace(session, &action_space_info, &action->pose_spaces[i]);
+		if (!xr_check(instance, result, "failed to create subaction path %d pose space", i))
 			return false;
 	}
 	return true;
@@ -933,7 +934,8 @@ create_vive_role_trackers(XrInstance instance,
 		}
 		free(name);
 
-		if (!create_action_space(instance, session, &next_tracker->action, &next_tracker->role_path)) {
+		if (!create_action_space(instance, session, &next_tracker->action, &next_tracker->role_path,
+		                         1)) {
 			return false;
 		}
 
@@ -2066,7 +2068,8 @@ main(int argc, char** argv)
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "handpose", "Hand Pose",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.hand_pose_action))
 		return 1;
-	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.hand_pose_action, hand_paths))
+	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.hand_pose_action, hand_paths,
+	                         HAND_COUNT))
 		return 1;
 
 	app.aim_action =
@@ -2074,7 +2077,8 @@ main(int argc, char** argv)
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "aim", "Aim Pose",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.aim_action))
 		return 1;
-	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.aim_action, hand_paths))
+	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.aim_action, hand_paths,
+	                         HAND_COUNT))
 		return 1;
 
 	app.haptic_action =
