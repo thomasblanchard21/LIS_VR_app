@@ -1443,11 +1443,29 @@ get_hand_tracking(XrInstance instance,
 	XrResult result;
 	result = hand_tracking->xrLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
 	                                              &hand_tracking->joint_locations[hand]);
+
+	/*
+	// print joint locations
+	if (result == XR_SUCCESS) {
+        printf("Hand Joint Locations for Hand %d:\n", hand);
+
+    	for (int jointIndex = 0; jointIndex < XR_HAND_JOINT_COUNT_EXT; ++jointIndex) {
+      	  XrHandJointLocationEXT jointLocation = hand_tracking->joint_locations[hand].jointLocations[jointIndex];
+
+      	  printf("Joint %d: X=%f, Y=%f, Z=%f\n", jointIndex,
+         	      jointLocation.pose.position.x,
+        	       jointLocation.pose.position.y,
+        	       jointLocation.pose.position.z);
+    	}
+    }
+	*/
+
 	if (!xr_check(instance, result, "failed to locate hand joints!"))
 		return false;
 
 	return true;
 }
+
 
 static struct option long_options[] = {{"help", no_argument, 0, 'h'},
                                        {"velocities", no_argument, 0, 'v'},
