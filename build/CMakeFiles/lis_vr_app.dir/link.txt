@@ -1,0 +1,1 @@
+/usr/bin/cc -g -rdynamic CMakeFiles/lis_vr_app.dir/main.c.o -o lis_vr_app  -lopenxr_loader -lXrandr -lSM -lICE -lX11 -lXext -lOpenGL -lGLX -lGLU -lSDL2 -lm 

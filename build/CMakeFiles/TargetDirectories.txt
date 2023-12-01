@@ -1,0 +1,7 @@
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/lis_vr_app.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/edit_cache.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/rebuild_cache.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/list_install_components.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/install.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/install/local.dir
+/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/install/strip.dir
