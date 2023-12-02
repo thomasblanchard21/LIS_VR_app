@@ -382,7 +382,7 @@ struct gl_renderer_t
 	float far_z;
 
 	GLuint shader_program_id;
-	GLuint VAO;
+	GLuint* VAOs;
 
 	struct
 	{
@@ -3188,7 +3188,9 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 	glDeleteShader(vertex_shader_id);
 	glDeleteShader(fragment_shader_id);
 
-	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
+
+	// vertices for a cube
+	float cube_vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
 	                    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
 	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
 
@@ -3210,22 +3212,51 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 
 	                    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
 	                    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	                    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
+	                    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};	
 
-	GLuint VBOs[1];
-	glGenBuffers(1, VBOs);
+	// vertices for a rectangle
+	float rectangle_vertices[] = {
+    // Positions (x, y, z)        // Texture Coordinates (s, t)
+    -0.5f, 0.0f, -0.5f,           0.0f, 0.0f,
+     0.5f, 0.0f, -0.5f,           1.0f, 0.0f,
+     0.5f, 0.0f,  0.5f,           1.0f, 1.0f,
+    -0.5f, 0.0f, -0.5f,           0.0f, 0.0f,
+     0.5f, 0.0f,  0.5f,           1.0f, 1.0f,
+    -0.5f, 0.0f,  0.5f,           0.0f, 1.0f 
+};
 
-	glGenVertexArrays(1, &gl_renderer->VAO);
 
-	glBindVertexArray(gl_renderer->VAO);
+
+	GLuint VBOs[2];
+	glGenBuffers(2, VBOs);
+
+	GLuint* VAOs;
+	VAOs = malloc(2 * sizeof(GLuint));
+	glGenVertexArrays(2, VAOs);
+	gl_renderer->VAOs = VAOs;
+
+	// Initialize cube VAO/VBO
+	glBindVertexArray(gl_renderer->VAOs[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_DYNAMIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_DYNAMIC_DRAW);
 	glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(5);
+
+	// Initialize rectangle VAO/VBO
+	glBindVertexArray(gl_renderer->VAOs[1]);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(rectangle_vertices), rectangle_vertices, GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(rectangle_vertices), rectangle_vertices, GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(5);
+
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -3423,7 +3454,6 @@ render_frame(struct ApplicationState* app,
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(gl_renderer->shader_program_id);
-	glBindVertexArray(gl_renderer->VAO);
 
 
 	XrMatrix4x4f projection_matrix;
@@ -3439,21 +3469,18 @@ render_frame(struct ApplicationState* app,
 
 
 	{
-		// use texture 0
+		// use rectangle VAO
+		glBindVertexArray(gl_renderer->VAOs[1]);
+
+		// render textured rectangle
 		glUniform4f(gl_renderer->colorLoc, 0.0, 0.0, 0.0, 0.0);
 
-		double display_time_seconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
-		const float rotations_per_sec = .25;
-		float angle = ((long)(display_time_seconds * 360. * rotations_per_sec)) % 360;
-
-		float dist = 1.5f;
-		float height = 0.5f;
-		render_rotated_cube(vec3(0, height, -dist), .33f, angle, gl_renderer->modelLoc);
-		render_rotated_cube(vec3(0, height, dist), .33f, angle, gl_renderer->modelLoc);
-		render_rotated_cube(vec3(dist, height, 0), .33f, angle, gl_renderer->modelLoc);
-		render_rotated_cube(vec3(-dist, height, 0), .33f, angle, gl_renderer->modelLoc);
+		float cube_size = 8.0;
+		render_rotated_cube(vec3(0, 0, 0), cube_size, 0, gl_renderer->modelLoc);
 	}
 
+	// use cube VAO
+	glBindVertexArray(gl_renderer->VAOs[0]);
 	// render controllers / hand joints
 	for (int hand = 0; hand < 2; hand++) {
 		if (hand == 0) {
