@@ -1614,7 +1614,8 @@ main(int argc, char** argv)
 
 	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
 
-	struct quad_layer_t quad_layer = {.pixel_width = 320, .pixel_height = 240};
+	// define texture width/height
+	struct quad_layer_t quad_layer = {.pixel_width = 512, .pixel_height = 512};
 
 	XrPath hand_paths[HAND_COUNT];
 	XrPath hand_interaction_profile[HAND_COUNT] = {0};
@@ -3216,14 +3217,15 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 
 	// vertices for a rectangle
 	float rectangle_vertices[] = {
-    // Positions (x, y, z)        // Texture Coordinates (s, t)
-    -0.5f, 0.0f, -0.5f,           0.0f, 0.0f,
-     0.5f, 0.0f, -0.5f,           1.0f, 0.0f,
-     0.5f, 0.0f,  0.5f,           1.0f, 1.0f,
-    -0.5f, 0.0f, -0.5f,           0.0f, 0.0f,
-     0.5f, 0.0f,  0.5f,           1.0f, 1.0f,
-    -0.5f, 0.0f,  0.5f,           0.0f, 1.0f 
-};
+		// Positions (x, y, z)        // Texture Coordinates (s, t)
+		-1.0f, 0.0f, -1.0f,           0.0f, 0.0f,
+		1.0f, 0.0f, -1.0f,           1.0f, 0.0f,
+		1.0f, 0.0f,  1.0f,           1.0f, 1.0f,
+		-1.0f, 0.0f, -1.0f,           0.0f, 0.0f,
+		1.0f, 0.0f,  1.0f,           1.0f, 1.0f,
+		-1.0f, 0.0f,  1.0f,           0.0f, 1.0f 
+	};
+
 
 
 
@@ -3475,8 +3477,8 @@ render_frame(struct ApplicationState* app,
 		// render textured rectangle
 		glUniform4f(gl_renderer->colorLoc, 0.0, 0.0, 0.0, 0.0);
 
-		float cube_size = 8.0;
-		render_rotated_cube(vec3(0, 0, 0), cube_size, 0, gl_renderer->modelLoc);
+		float rectangle_size = 4.05;
+		render_rotated_cube(vec3(0, 0, 0), rectangle_size, 0, gl_renderer->modelLoc);
 	}
 
 	// use cube VAO
@@ -3630,6 +3632,10 @@ render_frame(struct ApplicationState* app,
 
 void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, const char* image_path) {
     glGenTextures(1, &gl_renderer->quad.texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
@@ -3641,11 +3647,13 @@ void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* qua
         exit(EXIT_FAILURE);
     }
 
-    glViewport(0, 0, w, h);
-    glScissor(0, 0, w, h);
+	int width = quad->pixel_width;
+	int height = quad->pixel_height;
+    glViewport(0, 0, width, height);
+    glScissor(0, 0, width, height);
 
     // TODO: Respect format
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
     free(rgb);
 
     glGenFramebuffers(1, &gl_renderer->quad.fbo);
