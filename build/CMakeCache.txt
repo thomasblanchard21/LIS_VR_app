@@ -686,15 +686,6 @@ lis_vr_app_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 lis_vr_app_SOURCE_DIR:STATIC=/home/jarvis/thomas/LIS_VR_app
 
-//Value Computed by CMake
-openxr-example_BINARY_DIR:STATIC=/home/jarvis/thomas/LIS_VR_app/build
-
-//Value Computed by CMake
-openxr-example_IS_TOP_LEVEL:STATIC=ON
-
-//Value Computed by CMake
-openxr-example_SOURCE_DIR:STATIC=/home/jarvis/thomas/LIS_VR_app
-
 //Path to a library.
 pkgcfg_lib_OPENXR_openxr_loader:FILEPATH=/usr/lib/x86_64-linux-gnu/libopenxr_loader.so
 

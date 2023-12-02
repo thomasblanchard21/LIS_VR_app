@@ -21,6 +21,10 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
+// Headers for loading images
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 // Required headers for windowing, as well as the XrGraphicsBindingOpenGLXlibKHR struct.
 #include <X11/Xlib.h>
 #include <GL/glx.h>
@@ -389,6 +393,7 @@ struct gl_renderer_t
 
 	int modelLoc;
 	int colorLoc;
+	int textureLoc;
 	int viewLoc;
 	int projLoc;
 };
@@ -3093,26 +3098,26 @@ static const char* vertexshader =
     "layout(location = 2) uniform mat4 model;\n"
     "layout(location = 3) uniform mat4 view;\n"
     "layout(location = 4) uniform mat4 proj;\n"
-    "layout(location = 5) in vec2 aColor;\n"
-    "out vec2 vertexColor;\n"
+    "layout(location = 5) in vec2 aTexCoord;\n"
+    "out vec2 texCoord;\n"
     "void main() {\n"
-    "	gl_Position = proj * view * model * vec4(aPos.x, aPos.y, aPos.z, "
-    "1.0);\n"
-    "	vertexColor = aColor;\n"
+    "	gl_Position = proj * view * model * vec4(aPos, 1.0);\n"
+    "	texCoord = aTexCoord;\n"
     "}\n";
 
 static const char* fragmentshader =
     "#version 330 core\n"
     "#extension GL_ARB_explicit_uniform_location : require\n"
     "layout(location = 0) out vec4 FragColor;\n"
-    "layout(location = 1) uniform vec4 uniformColor;\n"
-    "in vec2 vertexColor;\n"
+    "uniform vec4 uniformColor;\n"
+    "layout(location=1) uniform sampler2D imageTexture;\n"
+    "in vec2 texCoord;\n"
     "void main() {\n"
-    "	FragColor = "
-    "(uniformColor.x < 0.01 && "
-    "uniformColor.y < 0.01 && "
-    "uniformColor.z < 0.01 && "
-    "uniformColor.w < 0.01 ? vec4(vertexColor, 1.0, 1.0) : uniformColor);\n"
+    "    FragColor = (uniformColor.x < 0.01 &&\n"
+    "                 uniformColor.y < 0.01 &&\n"
+    "                 uniformColor.z < 0.01)\n"
+    "                    ? texture(imageTexture, texCoord)\n"
+    "                    : uniformColor;\n"
     "}\n";
 
 
@@ -3226,6 +3231,7 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 
 	gl_renderer->modelLoc = glGetUniformLocation(gl_renderer->shader_program_id, "model");
 	gl_renderer->colorLoc = glGetUniformLocation(gl_renderer->shader_program_id, "uniformColor");
+	gl_renderer->textureLoc = glGetUniformLocation(gl_renderer->shader_program_id, "imageTexture");
 	gl_renderer->viewLoc = glGetUniformLocation(gl_renderer->shader_program_id, "view");
 	gl_renderer->projLoc = glGetUniformLocation(gl_renderer->shader_program_id, "proj");
 
@@ -3432,9 +3438,8 @@ render_frame(struct ApplicationState* app,
 	glUniformMatrix4fv(gl_renderer->projLoc, 1, GL_FALSE, (float*)projection_matrix.m);
 
 
-	// render scene with 4 colorful cubes
 	{
-		// the special color value (0, 0, 0) will get replaced by some UV color in the shader
+		// use texture 0
 		glUniform4f(gl_renderer->colorLoc, 0.0, 0.0, 0.0, 0.0);
 
 		double display_time_seconds = ((double)predictedDisplayTime) / (1000. * 1000. * 1000.);
@@ -3596,76 +3601,46 @@ render_frame(struct ApplicationState* app,
 	}
 }
 
-void
-initialze_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad)
-{
-	glGenTextures(1, &gl_renderer->quad.texture);
+void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, const char* image_path) {
+    glGenTextures(1, &gl_renderer->quad.texture);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
 
-	int w = quad->pixel_width;
-	int h = quad->pixel_height;
-	glViewport(0, 0, w, h);
-	glScissor(0, 0, w, h);
+    int w, h, channels;
+    uint8_t* rgb = stbi_load(image_path, &w, &h, &channels, STBI_rgb_alpha);
+    if (!rgb) {
+        fprintf(stderr, "Error loading image: %s\n", stbi_failure_reason());
+        exit(EXIT_FAILURE);
+    }
 
-	uint8_t* rgb = malloc(sizeof(uint8_t) * w * h * 4);
-	for (int row = 0; row < h; row++) {
-		for (int col = 0; col < w; col++) {
-			uint8_t* base = &rgb[(row * w * 4 + col * 4)];
-			*(base + 0) = (((float)row / (float)h)) * 255.;
-			*(base + 1) = 0;
-			*(base + 2) = 0;
-			*(base + 3) = 255;
+    glViewport(0, 0, w, h);
+    glScissor(0, 0, w, h);
 
-			if (abs(row - col) < 3) {
-				*(base + 0) = 255.;
-				*(base + 1) = 255;
-				*(base + 2) = 255;
-				*(base + 3) = 255;
-			}
+    // TODO: Respect format
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
+    free(rgb);
 
-			if (abs((w - col) - (row)) < 3) {
-				*(base + 0) = 0.;
-				*(base + 1) = 0;
-				*(base + 2) = 0;
-				*(base + 3) = 255;
-			}
-		}
-	}
+    glGenFramebuffers(1, &gl_renderer->quad.fbo);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_renderer->quad.texture, 0);
 
-	// TODO respect format
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-	             (GLvoid*)rgb);
-	free(rgb);
-
-	glGenFramebuffers(1, &gl_renderer->quad.fbo);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
-	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-	                       gl_renderer->quad.texture, 0);
-
-	gl_renderer->quad.initialized = true;
+    gl_renderer->quad.initialized = 1;
 }
 
-void
-render_quad(struct gl_renderer_t* gl_renderer,
-            struct quad_layer_t* quad,
-            uint32_t swapchain_index,
-            XrTime predictedDisplayTime)
-{
-	if (!gl_renderer->quad.initialized) {
-		printf("Creating Quad texture\n");
-		initialze_quad(gl_renderer, quad);
-	}
+void render_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, uint32_t swapchain_index, XrTime predictedDisplayTime) {
+    if (!gl_renderer->quad.initialized) {
+        printf("Creating Quad texture\n");
+        initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/cat.png");
+    }
 
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
 
-	GLuint texture = quad->swapchain.images[0][swapchain_index].image;
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, quad->pixel_width, quad->pixel_height);
+    GLuint texture = quad->swapchain.images[0][swapchain_index].image;
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, quad->pixel_width, quad->pixel_height);
 
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }
-
 
 #endif
