@@ -1615,7 +1615,7 @@ main(int argc, char** argv)
 	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
 
 	// define texture width/height
-	struct quad_layer_t quad_layer = {.pixel_width = 512, .pixel_height = 512};
+	struct quad_layer_t quad_layer = {.pixel_width = 500, .pixel_height = 300};
 
 	XrPath hand_paths[HAND_COUNT];
 	XrPath hand_interaction_profile[HAND_COUNT] = {0};
@@ -3217,14 +3217,15 @@ init_gl(uint32_t view_count, uint32_t* swapchain_lengths, struct gl_renderer_t* 
 
 	// vertices for a rectangle
 	float rectangle_vertices[] = {
-		// Positions (x, y, z)        // Texture Coordinates (s, t)
-		-1.0f, 0.0f, -1.0f,           0.0f, 0.0f,
-		1.0f, 0.0f, -1.0f,           1.0f, 0.0f,
-		1.0f, 0.0f,  1.0f,           1.0f, 1.0f,
-		-1.0f, 0.0f, -1.0f,           0.0f, 0.0f,
-		1.0f, 0.0f,  1.0f,           1.0f, 1.0f,
-		-1.0f, 0.0f,  1.0f,           0.0f, 1.0f 
+    // Positions (x, y, z)        // Texture Coordinates (s, t)
+    -1.5f, 0.0f, -0.8f,           0.0f, 0.0f,
+     1.5f, 0.0f, -0.8f,           1.0f, 0.0f,
+     1.5f, 0.0f,  0.8f,           1.0f, 1.0f,
+    -1.5f, 0.0f, -0.8f,           0.0f, 0.0f,
+     1.5f, 0.0f,  0.8f,           1.0f, 1.0f,
+    -1.5f, 0.0f,  0.8f,           0.0f, 1.0f 
 	};
+
 
 
 
@@ -3663,11 +3664,34 @@ void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* qua
     gl_renderer->quad.initialized = 1;
 }
 
+void update_texture(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, const char* image_path) {
+
+	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
+
+	int w, h, channels;
+    uint8_t* rgb = stbi_load(image_path, &w, &h, &channels, STBI_rgb_alpha);
+    if (!rgb) {
+        fprintf(stderr, "Error loading image: %s\n", stbi_failure_reason());
+        exit(EXIT_FAILURE);
+    }
+
+    // TODO: Respect format
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)quad->pixel_width, (GLsizei)quad->pixel_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
+    free(rgb);
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_renderer->quad.texture, 0);
+}
+
 void render_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, uint32_t swapchain_index, XrTime predictedDisplayTime) {
     if (!gl_renderer->quad.initialized) {
         printf("Creating Quad texture\n");
-        initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/cat.png");
+        //initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/cat.png");
+		initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/simulation_frame.jpg");
     }
+
+	update_texture(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/simulation_frame.jpg");
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
 
