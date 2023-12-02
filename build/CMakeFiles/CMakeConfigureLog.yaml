@@ -61,21 +61,21 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_e60c5/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_e60c5.dir/build.make CMakeFiles/cmTC_e60c5.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o'
-        Building C object CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o
-        /usr/bin/cc   -v -o CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -c /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_94856/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_94856.dir/build.make CMakeFiles/cmTC_94856.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv'
+        Building C object CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o
+        /usr/bin/cc   -v -o CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -c /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
@@ -85,8 +85,8 @@ events:
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
         gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) 
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/'
-         /usr/lib/gcc/x86_64-linux-gnu/11/cc1 -quiet -v -imultiarch x86_64-linux-gnu /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_e60c5.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/ccA5cjpk.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/'
+         /usr/lib/gcc/x86_64-linux-gnu/11/cc1 -quiet -v -imultiarch x86_64-linux-gnu /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_94856.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/ccNFrnPf.s
         GNU C17 (Ubuntu 11.4.0-1ubuntu1~22.04) version 11.4.0 (x86_64-linux-gnu)
         	compiled by GNU C version 11.4.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
         
@@ -106,15 +106,15 @@ events:
         
         GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
         Compiler executable checksum: 50eaa2331df977b8016186198deb2d18
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/'
-         as -v --64 -o CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o /tmp/ccA5cjpk.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/'
+         as -v --64 -o CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o /tmp/ccNFrnPf.s
         GNU assembler version 2.38 (x86_64-linux-gnu) using BFD version (GNU Binutils for Ubuntu) 2.38
         COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.'
-        Linking C executable cmTC_e60c5
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e60c5.dir/link.txt --verbose=1
-        /usr/bin/cc  -v -rdynamic CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -o cmTC_e60c5 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.'
+        Linking C executable cmTC_94856
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_94856.dir/link.txt --verbose=1
+        /usr/bin/cc  -v -rdynamic CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -o cmTC_94856 
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper
@@ -127,10 +127,10 @@ events:
         gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) 
         COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_e60c5' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_e60c5.'
-         /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccO6VsyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_e60c5 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o
-        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_e60c5' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_e60c5.'
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o'
+        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_94856' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_94856.'
+         /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccOHOP91.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_94856 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_94856' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_94856.'
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv'
         
       exitCode: 0
   -
@@ -164,13 +164,13 @@ events:
     message: |
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
-        ignore line: [Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o']
+        ignore line: [Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_e60c5/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_e60c5.dir/build.make CMakeFiles/cmTC_e60c5.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-M9Gk8o']
-        ignore line: [Building C object CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o]
-        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -c /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c]
+        ignore line: [Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_94856/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_94856.dir/build.make CMakeFiles/cmTC_94856.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-za5gDv']
+        ignore line: [Building C object CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -c /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
@@ -180,8 +180,8 @@ events:
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
         ignore line: [gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/']
-        ignore line: [ /usr/lib/gcc/x86_64-linux-gnu/11/cc1 -quiet -v -imultiarch x86_64-linux-gnu /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_e60c5.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/ccA5cjpk.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/']
+        ignore line: [ /usr/lib/gcc/x86_64-linux-gnu/11/cc1 -quiet -v -imultiarch x86_64-linux-gnu /usr/local/share/cmake-3.27/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_94856.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/ccNFrnPf.s]
         ignore line: [GNU C17 (Ubuntu 11.4.0-1ubuntu1~22.04) version 11.4.0 (x86_64-linux-gnu)]
         ignore line: [	compiled by GNU C version 11.4.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version isl-0.24-GMP]
         ignore line: []
@@ -201,15 +201,15 @@ events:
         ignore line: []
         ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
         ignore line: [Compiler executable checksum: 50eaa2331df977b8016186198deb2d18]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o /tmp/ccA5cjpk.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o /tmp/ccNFrnPf.s]
         ignore line: [GNU assembler version 2.38 (x86_64-linux-gnu) using BFD version (GNU Binutils for Ubuntu) 2.38]
         ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.']
-        ignore line: [Linking C executable cmTC_e60c5]
-        ignore line: [/usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e60c5.dir/link.txt --verbose=1]
-        ignore line: [/usr/bin/cc  -v -rdynamic CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -o cmTC_e60c5 ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.']
+        ignore line: [Linking C executable cmTC_94856]
+        ignore line: [/usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_94856.dir/link.txt --verbose=1]
+        ignore line: [/usr/bin/cc  -v -rdynamic CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -o cmTC_94856 ]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper]
@@ -222,13 +222,13 @@ events:
         ignore line: [gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) ]
         ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_e60c5' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_e60c5.']
-        link line: [ /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccO6VsyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_e60c5 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_94856' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_94856.']
+        link line: [ /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccOHOP91.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_94856 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/ccO6VsyW.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccOHOP91.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
           arg [-plugin-opt=-pass-through=-lc] ==> ignore
@@ -247,7 +247,7 @@ events:
           arg [-znow] ==> ignore
           arg [-zrelro] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_e60c5] ==> ignore
+          arg [cmTC_94856] ==> ignore
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o]
@@ -259,7 +259,7 @@ events:
           arg [-L/usr/lib/x86_64-linux-gnu] ==> dir [/usr/lib/x86_64-linux-gnu]
           arg [-L/usr/lib/../lib] ==> dir [/usr/lib/../lib]
           arg [-L/usr/lib/gcc/x86_64-linux-gnu/11/../../..] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/11/../../..]
-          arg [CMakeFiles/cmTC_e60c5.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [CMakeFiles/cmTC_94856.dir/CMakeCCompilerABI.c.o] ==> ignore
           arg [-lgcc] ==> lib [gcc]
           arg [--push-state] ==> ignore
           arg [--as-needed] ==> ignore
@@ -299,21 +299,21 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng"
     cmakeVariables:
       CMAKE_CXX_FLAGS: ""
     buildResult:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_1fd54/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_1fd54.dir/build.make CMakeFiles/cmTC_1fd54.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw'
-        Building CXX object CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o
-        /usr/bin/c++   -v -o CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -c /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_92f4b/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_92f4b.dir/build.make CMakeFiles/cmTC_92f4b.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng'
+        Building CXX object CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o
+        /usr/bin/c++   -v -o CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -c /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
@@ -323,8 +323,8 @@ events:
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
         gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) 
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/'
-         /usr/lib/gcc/x86_64-linux-gnu/11/cc1plus -quiet -v -imultiarch x86_64-linux-gnu -D_GNU_SOURCE /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_1fd54.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/cc8j1ypL.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/'
+         /usr/lib/gcc/x86_64-linux-gnu/11/cc1plus -quiet -v -imultiarch x86_64-linux-gnu -D_GNU_SOURCE /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_92f4b.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/cccLJYyf.s
         GNU C++17 (Ubuntu 11.4.0-1ubuntu1~22.04) version 11.4.0 (x86_64-linux-gnu)
         	compiled by GNU C version 11.4.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
         
@@ -348,15 +348,15 @@ events:
         
         GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
         Compiler executable checksum: d591828bb4d392ae8b7b160e5bb0b95f
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/'
-         as -v --64 -o CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc8j1ypL.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/'
+         as -v --64 -o CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o /tmp/cccLJYyf.s
         GNU assembler version 2.38 (x86_64-linux-gnu) using BFD version (GNU Binutils for Ubuntu) 2.38
         COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.'
-        Linking CXX executable cmTC_1fd54
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1fd54.dir/link.txt --verbose=1
-        /usr/bin/c++  -v -rdynamic CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_1fd54 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.'
+        Linking CXX executable cmTC_92f4b
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_92f4b.dir/link.txt --verbose=1
+        /usr/bin/c++  -v -rdynamic CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_92f4b 
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper
@@ -369,10 +369,10 @@ events:
         gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) 
         COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_1fd54' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_1fd54.'
-         /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/cchZ4B78.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_1fd54 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o
-        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_1fd54' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_1fd54.'
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw'
+        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_92f4b' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_92f4b.'
+         /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccib5H8z.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_92f4b /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_92f4b' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_92f4b.'
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng'
         
       exitCode: 0
   -
@@ -412,13 +412,13 @@ events:
     message: |
       Parsed CXX implicit link information:
         link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
-        ignore line: [Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw']
+        ignore line: [Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_1fd54/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_1fd54.dir/build.make CMakeFiles/cmTC_1fd54.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-b1rPvw']
-        ignore line: [Building CXX object CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o]
-        ignore line: [/usr/bin/c++   -v -o CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -c /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_92f4b/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_92f4b.dir/build.make CMakeFiles/cmTC_92f4b.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-HUPJng']
+        ignore line: [Building CXX object CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o]
+        ignore line: [/usr/bin/c++   -v -o CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -c /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
@@ -428,8 +428,8 @@ events:
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
         ignore line: [gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/']
-        ignore line: [ /usr/lib/gcc/x86_64-linux-gnu/11/cc1plus -quiet -v -imultiarch x86_64-linux-gnu -D_GNU_SOURCE /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_1fd54.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/cc8j1ypL.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/']
+        ignore line: [ /usr/lib/gcc/x86_64-linux-gnu/11/cc1plus -quiet -v -imultiarch x86_64-linux-gnu -D_GNU_SOURCE /usr/local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_92f4b.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fasynchronous-unwind-tables -fstack-protector-strong -Wformat -Wformat-security -fstack-clash-protection -fcf-protection -o /tmp/cccLJYyf.s]
         ignore line: [GNU C++17 (Ubuntu 11.4.0-1ubuntu1~22.04) version 11.4.0 (x86_64-linux-gnu)]
         ignore line: [	compiled by GNU C version 11.4.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version isl-0.24-GMP]
         ignore line: []
@@ -453,15 +453,15 @@ events:
         ignore line: []
         ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
         ignore line: [Compiler executable checksum: d591828bb4d392ae8b7b160e5bb0b95f]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc8j1ypL.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o /tmp/cccLJYyf.s]
         ignore line: [GNU assembler version 2.38 (x86_64-linux-gnu) using BFD version (GNU Binutils for Ubuntu) 2.38]
         ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.']
-        ignore line: [Linking CXX executable cmTC_1fd54]
-        ignore line: [/usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1fd54.dir/link.txt --verbose=1]
-        ignore line: [/usr/bin/c++  -v -rdynamic CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_1fd54 ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [Linking CXX executable cmTC_92f4b]
+        ignore line: [/usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_92f4b.dir/link.txt --verbose=1]
+        ignore line: [/usr/bin/c++  -v -rdynamic CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_92f4b ]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper]
@@ -474,13 +474,13 @@ events:
         ignore line: [gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) ]
         ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/11/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/11/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_1fd54' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_1fd54.']
-        link line: [ /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/cchZ4B78.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_1fd54 /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_92f4b' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_92f4b.']
+        link line: [ /usr/lib/gcc/x86_64-linux-gnu/11/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper -plugin-opt=-fresolution=/tmp/ccib5H8z.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_92f4b /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/11/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/11/../../.. CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crtn.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/11/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/cchZ4B78.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccib5H8z.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-lc] ==> ignore
@@ -499,7 +499,7 @@ events:
           arg [-znow] ==> ignore
           arg [-zrelro] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_1fd54] ==> ignore
+          arg [cmTC_92f4b] ==> ignore
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/crti.o]
           arg [/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o] ==> obj [/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o]
@@ -511,7 +511,7 @@ events:
           arg [-L/usr/lib/x86_64-linux-gnu] ==> dir [/usr/lib/x86_64-linux-gnu]
           arg [-L/usr/lib/../lib] ==> dir [/usr/lib/../lib]
           arg [-L/usr/lib/gcc/x86_64-linux-gnu/11/../../..] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/11/../../..]
-          arg [CMakeFiles/cmTC_1fd54.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [CMakeFiles/cmTC_92f4b.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
           arg [-lstdc++] ==> lib [stdc++]
           arg [-lm] ==> lib [m]
           arg [-lgcc_s] ==> lib [gcc_s]
@@ -547,25 +547,25 @@ events:
     checks:
       - "Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "X11_LIB_X11_SOLO"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_9ff45/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_9ff45.dir/build.make CMakeFiles/cmTC_9ff45.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A'
-        Building C object CMakeFiles/cmTC_9ff45.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=XOpenDisplay -o CMakeFiles/cmTC_9ff45.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A/CheckFunctionExists.c
-        Linking C executable cmTC_9ff45
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9ff45.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=XOpenDisplay -rdynamic CMakeFiles/cmTC_9ff45.dir/CheckFunctionExists.c.o -o cmTC_9ff45  /usr/lib/x86_64-linux-gnu/libX11.so /usr/lib/x86_64-linux-gnu/libXext.so 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-BMf59A'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_02543/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_02543.dir/build.make CMakeFiles/cmTC_02543.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S'
+        Building C object CMakeFiles/cmTC_02543.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=XOpenDisplay -o CMakeFiles/cmTC_02543.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S/CheckFunctionExists.c
+        Linking C executable cmTC_02543
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_02543.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=XOpenDisplay -rdynamic CMakeFiles/cmTC_02543.dir/CheckFunctionExists.c.o -o cmTC_02543  /usr/lib/x86_64-linux-gnu/libX11.so /usr/lib/x86_64-linux-gnu/libXext.so 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-Fbce1S'
         
       exitCode: 0
   -
@@ -577,25 +577,25 @@ events:
     checks:
       - "Looking for gethostbyname"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_HAVE_GETHOSTBYNAME"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_d20b3/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_d20b3.dir/build.make CMakeFiles/cmTC_d20b3.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG'
-        Building C object CMakeFiles/cmTC_d20b3.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=gethostbyname -o CMakeFiles/cmTC_d20b3.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG/CheckFunctionExists.c
-        Linking C executable cmTC_d20b3
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_d20b3.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=gethostbyname -rdynamic CMakeFiles/cmTC_d20b3.dir/CheckFunctionExists.c.o -o cmTC_d20b3 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-WoRrtG'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_7693c/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_7693c.dir/build.make CMakeFiles/cmTC_7693c.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0'
+        Building C object CMakeFiles/cmTC_7693c.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=gethostbyname -o CMakeFiles/cmTC_7693c.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0/CheckFunctionExists.c
+        Linking C executable cmTC_7693c
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7693c.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=gethostbyname -rdynamic CMakeFiles/cmTC_7693c.dir/CheckFunctionExists.c.o -o cmTC_7693c 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-LNUWa0'
         
       exitCode: 0
   -
@@ -607,25 +607,25 @@ events:
     checks:
       - "Looking for connect"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_HAVE_CONNECT"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_47354/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_47354.dir/build.make CMakeFiles/cmTC_47354.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v'
-        Building C object CMakeFiles/cmTC_47354.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=connect -o CMakeFiles/cmTC_47354.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v/CheckFunctionExists.c
-        Linking C executable cmTC_47354
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_47354.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=connect -rdynamic CMakeFiles/cmTC_47354.dir/CheckFunctionExists.c.o -o cmTC_47354 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-vPAi0v'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_5bfe9/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_5bfe9.dir/build.make CMakeFiles/cmTC_5bfe9.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH'
+        Building C object CMakeFiles/cmTC_5bfe9.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=connect -o CMakeFiles/cmTC_5bfe9.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH/CheckFunctionExists.c
+        Linking C executable cmTC_5bfe9
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5bfe9.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=connect -rdynamic CMakeFiles/cmTC_5bfe9.dir/CheckFunctionExists.c.o -o cmTC_5bfe9 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-PqGdJH'
         
       exitCode: 0
   -
@@ -637,25 +637,25 @@ events:
     checks:
       - "Looking for remove"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_HAVE_REMOVE"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_96bd0/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_96bd0.dir/build.make CMakeFiles/cmTC_96bd0.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB'
-        Building C object CMakeFiles/cmTC_96bd0.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=remove -o CMakeFiles/cmTC_96bd0.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB/CheckFunctionExists.c
-        Linking C executable cmTC_96bd0
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_96bd0.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=remove -rdynamic CMakeFiles/cmTC_96bd0.dir/CheckFunctionExists.c.o -o cmTC_96bd0 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-NlcTkB'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_3eacb/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_3eacb.dir/build.make CMakeFiles/cmTC_3eacb.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB'
+        Building C object CMakeFiles/cmTC_3eacb.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=remove -o CMakeFiles/cmTC_3eacb.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB/CheckFunctionExists.c
+        Linking C executable cmTC_3eacb
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3eacb.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=remove -rdynamic CMakeFiles/cmTC_3eacb.dir/CheckFunctionExists.c.o -o cmTC_3eacb 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-0i7mmB'
         
       exitCode: 0
   -
@@ -667,25 +667,25 @@ events:
     checks:
       - "Looking for shmat"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_HAVE_SHMAT"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_7d295/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_7d295.dir/build.make CMakeFiles/cmTC_7d295.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl'
-        Building C object CMakeFiles/cmTC_7d295.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=shmat -o CMakeFiles/cmTC_7d295.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl/CheckFunctionExists.c
-        Linking C executable cmTC_7d295
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7d295.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=shmat -rdynamic CMakeFiles/cmTC_7d295.dir/CheckFunctionExists.c.o -o cmTC_7d295 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wqbGyl'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_3225a/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_3225a.dir/build.make CMakeFiles/cmTC_3225a.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m'
+        Building C object CMakeFiles/cmTC_3225a.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=shmat -o CMakeFiles/cmTC_3225a.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m/CheckFunctionExists.c
+        Linking C executable cmTC_3225a
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3225a.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=shmat -rdynamic CMakeFiles/cmTC_3225a.dir/CheckFunctionExists.c.o -o cmTC_3225a 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-RW2o6m'
         
       exitCode: 0
   -
@@ -697,25 +697,25 @@ events:
     checks:
       - "Looking for IceConnectionNumber in ICE"
     directories:
-      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf"
-      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf"
+      source: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2"
+      binary: "/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
     buildResult:
       variable: "CMAKE_LIB_ICE_HAS_ICECONNECTIONNUMBER"
       cached: true
       stdout: |
-        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf'
+        Change Dir: '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2'
         
-        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_7c41c/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_7c41c.dir/build.make CMakeFiles/cmTC_7c41c.dir/build
-        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf'
-        Building C object CMakeFiles/cmTC_7c41c.dir/CheckFunctionExists.c.o
-        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=IceConnectionNumber -o CMakeFiles/cmTC_7c41c.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf/CheckFunctionExists.c
-        Linking C executable cmTC_7c41c
-        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7c41c.dir/link.txt --verbose=1
-        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=IceConnectionNumber -rdynamic CMakeFiles/cmTC_7c41c.dir/CheckFunctionExists.c.o -o cmTC_7c41c  -lICE 
-        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-wuqGAf'
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_fc9aa/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_fc9aa.dir/build.make CMakeFiles/cmTC_fc9aa.dir/build
+        gmake[1]: Entering directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2'
+        Building C object CMakeFiles/cmTC_fc9aa.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=IceConnectionNumber -o CMakeFiles/cmTC_fc9aa.dir/CheckFunctionExists.c.o -c /home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2/CheckFunctionExists.c
+        Linking C executable cmTC_fc9aa
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fc9aa.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=IceConnectionNumber -rdynamic CMakeFiles/cmTC_fc9aa.dir/CheckFunctionExists.c.o -o cmTC_fc9aa  -lICE 
+        gmake[1]: Leaving directory '/home/jarvis/thomas/LIS_VR_app/build/CMakeFiles/CMakeScratch/TryCompile-s8Fmn2'
         
       exitCode: 0
 ...
