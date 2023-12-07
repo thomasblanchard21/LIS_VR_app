@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <getopt.h>
+#include <pthread.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -106,7 +107,42 @@ static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0
 #define HAND_COUNT 2
 
 
-// =============================================================================
+// UDP
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 12345
+#define MAX_BUFFER_SIZE 65507
+
+typedef struct {
+    int width;
+    int height;
+} TextureInfo;
+
+typedef struct {
+    int sockfd;
+    struct sockaddr_in* client_addr;
+} UdpArgs;
+
+struct MainArgs {
+    int argc;
+    char** argv;
+};
+
+TextureInfo textureInfo;
+GLubyte* buffer = NULL;
+size_t buffer_size = 0;
+
+
+pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Define min/max macros
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+
+// ============================================================================
 // math code adapted from
 // https://github.com/KhronosGroup/OpenXR-SDK-Source/blob/master/src/common/xr_linear.h
 // Copyright (c) 2017 The Khronos Group Inc.
@@ -1568,9 +1604,10 @@ parse_opts(int argc, char** argv, struct ApplicationState* app)
 	}
 }
 
-int
-main(int argc, char** argv)
+//int main_loop(int argc, char** argv)
+void *main_loop(void* arg)
 {
+	printf("Entering main loop\n");
 	struct ApplicationState app = {
 	    .ext =
 	        {
@@ -1607,6 +1644,10 @@ main(int argc, char** argv)
 
 	};
 
+	struct MainArgs* mainArgs = (struct MainArgs*)arg;
+    int argc = mainArgs->argc;
+    char** argv = mainArgs->argv;
+
 	parse_opts(argc, argv, &app);
 
 	// The runtime interacts with the OpenGL images (textures) via a Swapchain.
@@ -1615,7 +1656,7 @@ main(int argc, char** argv)
 	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
 
 	// define texture width/height
-	struct quad_layer_t quad_layer = {.pixel_width = 500, .pixel_height = 300};
+	struct quad_layer_t quad_layer = {.pixel_width = 460, .pixel_height = 276};
 
 	XrPath hand_paths[HAND_COUNT];
 	XrPath hand_interaction_profile[HAND_COUNT] = {0};
@@ -2312,6 +2353,9 @@ main(int argc, char** argv)
 
 	bool quit_renderloop = false;
 	bool session_running = false; // to avoid beginning an already running app.oxr.session
+
+
+	// RENDER LOOP
 	while (!quit_renderloop) {
 
 		// --- Poll SDL for events so we can exit with esc
@@ -3006,6 +3050,8 @@ main(int argc, char** argv)
 	free(app.ext.depth.infos);
 
 	printf("Cleaned up!\n");
+
+	return NULL;
 }
 
 
@@ -3631,31 +3677,21 @@ render_frame(struct ApplicationState* app,
 	}
 }
 
-void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, const char* image_path) {
+void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad) {
     glGenTextures(1, &gl_renderer->quad.texture);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
-
-    int w, h, channels;
-    uint8_t* rgb = stbi_load(image_path, &w, &h, &channels, STBI_rgb_alpha);
-    if (!rgb) {
-        fprintf(stderr, "Error loading image: %s\n", stbi_failure_reason());
-        exit(EXIT_FAILURE);
-    }
-
 	int width = quad->pixel_width;
 	int height = quad->pixel_height;
     glViewport(0, 0, width, height);
     glScissor(0, 0, width, height);
-
-    // TODO: Respect format
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
-    free(rgb);
 
     glGenFramebuffers(1, &gl_renderer->quad.fbo);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
@@ -3664,21 +3700,19 @@ void initialize_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* qua
     gl_renderer->quad.initialized = 1;
 }
 
-void update_texture(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, const char* image_path) {
+void update_texture(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad) {
 
 	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gl_renderer->quad.texture);
 
-	int w, h, channels;
-    uint8_t* rgb = stbi_load(image_path, &w, &h, &channels, STBI_rgb_alpha);
-    if (!rgb) {
-        fprintf(stderr, "Error loading image: %s\n", stbi_failure_reason());
-        exit(EXIT_FAILURE);
-    }
+	// lock mutex
+	pthread_mutex_lock(&buffer_mutex);
 
-    // TODO: Respect format
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)quad->pixel_width, (GLsizei)quad->pixel_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)rgb);
-    free(rgb);
+    // Frame is RGB
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)quad->pixel_width, (GLsizei)quad->pixel_height, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+
+	// unlock mutex
+	pthread_mutex_unlock(&buffer_mutex);
 
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_renderer->quad.texture, 0);
@@ -3688,10 +3722,10 @@ void render_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, u
     if (!gl_renderer->quad.initialized) {
         printf("Creating Quad texture\n");
         //initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/cat.png");
-		initialize_quad(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/simulation_frame.jpg");
+		initialize_quad(gl_renderer, quad);
     }
 
-	update_texture(gl_renderer, quad, "/home/jarvis/thomas/LIS_VR_app/simulation_frame.jpg");
+	update_texture(gl_renderer, quad);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gl_renderer->quad.fbo);
 
@@ -3703,3 +3737,157 @@ void render_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, u
 }
 
 #endif
+
+// udp functions
+
+void *udp_receiver(void* arg) {
+
+
+	// set up UDP receiver
+	int sockfd;
+	struct sockaddr_in server_addr;
+	struct sockaddr_in* client_addr = malloc(sizeof(struct sockaddr_in));
+	socklen_t addr_len = sizeof(*client_addr);
+	
+
+
+    // Create the socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set the server address
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    // Bind socket to server address
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Waiting for data...\n");
+
+
+	while (1) {
+    
+        // Receive data
+        GLubyte recv_buffer[MAX_BUFFER_SIZE];
+        int bytes_received = recvfrom(sockfd, recv_buffer, MAX_BUFFER_SIZE, 0, (struct sockaddr *)client_addr, &addr_len);
+
+        if (bytes_received == -1) {
+            perror("recvfrom failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Check if recv_buffer is properly allocated
+        if (recv_buffer == NULL) {
+            printf("Error: recvbuffer is NULL\n");
+            return NULL;
+        }
+
+        // Check if client_addr is NULL
+        if (client_addr == NULL) {
+            printf("Error: client_addr is NULL\n");
+            return NULL;
+        }
+        // Check if client_addr is properly initialized
+        if (((struct sockaddr_in*)client_addr)->sin_family != AF_INET) {
+			printf("Error: client_addr is not properly initialized\n");
+			return NULL;
+		}
+
+
+		// lock mutex
+		pthread_mutex_lock(&buffer_mutex);
+
+        if (bytes_received == sizeof(TextureInfo)) {
+            
+            memcpy(&textureInfo, recv_buffer, sizeof(TextureInfo));
+            
+            printf("Received data from %s:%d\n", inet_ntoa(((struct sockaddr_in*)client_addr)->sin_addr), ntohs(((struct sockaddr_in*)client_addr)->sin_port));
+            printf("Texture info: width = %d, height = %d\n", textureInfo.width, textureInfo.height);
+
+			//printf("1\n");
+            int total_bytes_expected = textureInfo.width * textureInfo.height * 3;
+            buffer = (GLubyte*)realloc(buffer, total_bytes_expected);
+            if (buffer == NULL) {
+                perror("realloc failed");
+                exit(EXIT_FAILURE);
+            }
+
+			//printf("2\n");
+            int total_bytes_received = 0;
+            while (total_bytes_received < total_bytes_expected) {
+				//printf("2.1\n");
+                bytes_received = recvfrom(sockfd, recv_buffer, MIN(MAX_BUFFER_SIZE,total_bytes_expected-total_bytes_received), 0, (struct sockaddr *)client_addr, &addr_len);
+                if (bytes_received == -1) {
+                    perror("recvfrom failed");
+                    exit(EXIT_FAILURE);
+                }
+				//printf("2.2\n");
+				printf("Size of total_bytes_expected (buffer size): %d\n", total_bytes_expected);
+				printf("Value of total_bytes_received: %d\n", total_bytes_received);
+				printf("Value of bytes_received: %d\n", bytes_received);
+				printf("\n");
+
+                memcpy(buffer + total_bytes_received, recv_buffer, bytes_received);
+				//printf("2.3\n");
+                total_bytes_received += bytes_received;
+            }
+            
+
+			//printf("3\n");
+            // After receiving all the data, check if you've received the expected amount of data
+            if (total_bytes_received != textureInfo.width * textureInfo.height * 3) {
+                printf("Error: Received %d bytes, expected %d bytes\n", total_bytes_received, textureInfo.width * textureInfo.height * 3);
+                free(buffer);
+                exit(EXIT_FAILURE);
+            } else {
+                printf("Received %d bytes\n", total_bytes_received);
+                buffer_size = total_bytes_received;
+            }
+        }
+		printf("Received one frame!\n");
+
+		// unlock mutex
+		pthread_mutex_unlock(&buffer_mutex);
+	    }
+
+	free(client_addr);
+
+    return NULL;
+}
+
+
+// Main function with threads	
+
+int main(int argc, char** argv) {
+
+	pthread_mutex_init(&buffer_mutex, NULL);
+	
+	pthread_t mainLoopThreadId, udpReceiverThreadId;
+
+	struct MainArgs mainArgs;
+    mainArgs.argc = argc;
+    mainArgs.argv = argv;
+
+	if (pthread_create(&udpReceiverThreadId, NULL, udp_receiver, NULL) != 0) {
+        perror("pthread_create for udp receiver failed");
+        exit(EXIT_FAILURE);
+    }
+
+	if (pthread_create(&mainLoopThreadId, NULL, main_loop, (void*)&mainArgs) != 0) {
+        perror("pthread_create for main loop failed");
+        exit(EXIT_FAILURE);
+    }
+
+	pthread_join(udpReceiverThreadId, NULL);
+
+	pthread_join(mainLoopThreadId, NULL);
+
+	pthread_mutex_destroy(&buffer_mutex);
+
+}
