@@ -8,9 +8,11 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -112,18 +114,16 @@ static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 12345
+#define RECEIVER_IP "127.0.0.1"
+#define RECEIVER_PORT 12345
+#define SENDER_PORT 54321
 #define MAX_BUFFER_SIZE 65507
+#define SCALE 0.92
 
 typedef struct {
     int width;
     int height;
 } TextureInfo;
-
-typedef struct {
-    int sockfd;
-    struct sockaddr_in* client_addr;
-} UdpArgs;
 
 struct MainArgs {
     int argc;
@@ -131,9 +131,21 @@ struct MainArgs {
 };
 
 TextureInfo textureInfo;
-GLubyte* buffer = NULL;
-size_t buffer_size = 0;
+GLubyte* buffer_in = NULL;
+size_t buffer_in_size = 0;
+GLuint prev_frame_id = 0;
+int skip_frame_count = 0;
 
+int VR_initialized = 0;
+
+typedef struct {
+	int hand;
+	int joint_index;
+    XrVector3f pose;
+} JointData;
+
+GLubyte* buffer_out = NULL;
+size_t buffer_out_size = 0;
 
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1484,22 +1496,43 @@ get_hand_tracking(XrInstance instance,
 	XrResult result;
 	result = hand_tracking->xrLocateHandJointsEXT(hand_tracking->trackers[hand], &locateInfo,
 	                                              &hand_tracking->joint_locations[hand]);
+	
 
-	/*
-	// print joint locations
 	if (result == XR_SUCCESS) {
-        printf("Hand Joint Locations for Hand %d:\n", hand);
+		for (int jointIndex = 0; jointIndex < XR_HAND_JOINT_COUNT_EXT; ++jointIndex) {
+			XrHandJointLocationEXT jointLocation =
+				hand_tracking->joint_locations[hand].jointLocations[jointIndex];
 
-    	for (int jointIndex = 0; jointIndex < XR_HAND_JOINT_COUNT_EXT; ++jointIndex) {
-      	  XrHandJointLocationEXT jointLocation = hand_tracking->joint_locations[hand].jointLocations[jointIndex];
+			// Create a JointLocation structure to hold the data
+			JointData joint;
 
-      	  printf("Joint %d: X=%f, Y=%f, Z=%f\n", jointIndex,
-         	      jointLocation.pose.position.x,
-        	       jointLocation.pose.position.y,
-        	       jointLocation.pose.position.z);
-    	}
-    }
-	*/
+			// Set the hand information
+			joint.hand = hand;
+			joint.joint_index = jointIndex;
+
+			// Check if the bit corresponding to the joint location is set
+			if (jointLocation.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) {
+				// Set to jointLocation.pose if the bit is set
+				joint.pose = jointLocation.pose.position;
+			} else {
+				// Set to default value (100.0f) if the bit is not set
+				joint.pose.x = 100.0f;
+				joint.pose.y = 100.0f;
+				joint.pose.z = 100.0f;
+			}
+
+			// printf("Hand %d, joint %d: X=%f, Y=%f, Z=%f\n", joint.hand, joint.joint_index, joint.pose.x, joint.pose.y,
+			//        joint.pose.z);
+
+			// Calculate the offset in the buffer for the current joint
+			size_t offset = jointIndex * sizeof(JointData) + hand * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
+
+			// printf("Offset: %lu\n", offset);
+
+			// Copy the JointLocation structure to the buffer
+			memcpy(&buffer_out[offset], &joint, sizeof(JointData));
+		}
+	}
 
 	if (!xr_check(instance, result, "failed to locate hand joints!"))
 		return false;
@@ -1604,10 +1637,10 @@ parse_opts(int argc, char** argv, struct ApplicationState* app)
 	}
 }
 
-//int main_loop(int argc, char** argv)
 void *main_loop(void* arg)
 {
 	printf("Entering main loop\n");
+
 	struct ApplicationState app = {
 	    .ext =
 	        {
@@ -1643,7 +1676,6 @@ void *main_loop(void* arg)
 	    .query_hand_velocities = false,
 
 	};
-
 	struct MainArgs* mainArgs = (struct MainArgs*)arg;
     int argc = mainArgs->argc;
     char** argv = mainArgs->argv;
@@ -1656,7 +1688,7 @@ void *main_loop(void* arg)
 	struct swapchain_t vr_swapchains[SWAPCHAIN_LAST];
 
 	// define texture width/height
-	struct quad_layer_t quad_layer = {.pixel_width = 460, .pixel_height = 276};
+	struct quad_layer_t quad_layer = {.pixel_width = 500 * SCALE, .pixel_height = 300 * SCALE};
 
 	XrPath hand_paths[HAND_COUNT];
 	XrPath hand_interaction_profile[HAND_COUNT] = {0};
@@ -1666,14 +1698,13 @@ void *main_loop(void* arg)
 	// reuse this variable for all our OpenXR return codes
 	XrResult result = XR_SUCCESS;
 
-
 	result = _check_extensions(&app, &app.ext);
 	if (!xr_check(app.oxr.instance, result, "Extensions check failed!")) {
-		return 1;
+		return (void *)1;
 	}
 	if (!app.ext.opengl.base.supported) {
 		printf("%s is required\n", app.ext.opengl.base.ext_name_string);
-		return 1;
+		return (void *)1;
 	};
 
 
@@ -1723,11 +1754,11 @@ void *main_loop(void* arg)
 
 	result = xrCreateInstance(&instance_create_info, &app.oxr.instance);
 	if (!xr_check(NULL, result, "Failed to create XR instance."))
-		return 1;
+		return (void *)1;
 
 	result = _init_extensions(app.oxr.instance, &app.ext);
 	if (!xr_check(app.oxr.instance, result, "Failed to init extensions!")) {
-		return 1;
+		return (void *)1;
 	}
 
 	// Optionally get runtime name and version
@@ -1739,7 +1770,7 @@ void *main_loop(void* arg)
 
 	result = xrGetSystem(app.oxr.instance, &system_get_info, &app.oxr.system_id);
 	if (!xr_check(app.oxr.instance, result, "Failed to get system for HMD form factor."))
-		return 1;
+		return (void *)1;
 
 	printf("Successfully got XrSystem with id %lu for HMD form factor\n", app.oxr.system_id);
 
@@ -1762,7 +1793,7 @@ void *main_loop(void* arg)
 
 		result = xrGetSystemProperties(app.oxr.instance, app.oxr.system_id, &system_props);
 		if (!xr_check(app.oxr.instance, result, "Failed to get System properties"))
-			return 1;
+			return (void *)1;
 
 		app.ext.hand_tracking.system_supported =
 		    app.ext.hand_tracking.base.supported && ht.supportsHandTracking;
@@ -1779,7 +1810,7 @@ void *main_loop(void* arg)
 	result = xrEnumerateViewConfigurationViews(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
 	                                           0, &app.oxr.view_count, NULL);
 	if (!xr_check(app.oxr.instance, result, "Failed to get view configuration view count!"))
-		return 1;
+		return (void *)1;
 
 	app.oxr.viewconfig_views = malloc(sizeof(XrViewConfigurationView) * app.oxr.view_count);
 	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
@@ -1791,7 +1822,7 @@ void *main_loop(void* arg)
 	                                           app.oxr.view_count, &app.oxr.view_count,
 	                                           app.oxr.viewconfig_views);
 	if (!xr_check(app.oxr.instance, result, "Failed to enumerate view configuration views!"))
-		return 1;
+		return (void *)1;
 	print_viewconfig_view_info(app.oxr.view_count, app.oxr.viewconfig_views);
 
 
@@ -1803,7 +1834,7 @@ void *main_loop(void* arg)
 	result = app.ext.opengl.xrGetOpenGLGraphicsRequirementsKHR(app.oxr.instance, app.oxr.system_id,
 	                                                           &opengl_reqs);
 	if (!xr_check(app.oxr.instance, result, "Failed to get OpenGL graphics requirements!"))
-		return 1;
+		return (void *)1;
 
 	// On OpenGL we never fail this check because the version requirement is not useful.
 	// Other APIs may have more useful requirements.
@@ -1814,13 +1845,13 @@ void *main_loop(void* arg)
 	result = xrEnumerateEnvironmentBlendModes(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
 	                                          0, &blend_mode_count, NULL);
 	if (!xr_check(app.oxr.instance, result, "failed to enumerate blend mode count!"))
-		return 1;
+		return (void *)1;
 
 	XrEnvironmentBlendMode* blend_modes = malloc(sizeof(XrEnvironmentBlendMode) * blend_mode_count);
 	result = xrEnumerateEnvironmentBlendModes(app.oxr.instance, app.oxr.system_id, app.oxr.view_type,
 	                                          blend_mode_count, &blend_mode_count, blend_modes);
 	if (!xr_check(app.oxr.instance, result, "failed to enumerate blend modes!"))
-		return 1;
+		return (void *)1;
 
 	XrEnvironmentBlendMode mode_preference1 = XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
 	XrEnvironmentBlendMode mode_preference2 = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
@@ -1852,7 +1883,7 @@ void *main_loop(void* arg)
 	                     app.oxr.viewconfig_views[0].recommendedImageRectWidth,
 	                     app.oxr.viewconfig_views[0].recommendedImageRectHeight)) {
 		printf("GLX init failed!\n");
-		return 1;
+		return (void *)1;
 	}
 
 	printf("Using OpenGL version: %s\n", glGetString(GL_VERSION));
@@ -1866,7 +1897,7 @@ void *main_loop(void* arg)
 
 	result = xrCreateSession(app.oxr.instance, &session_create_info, &app.oxr.session);
 	if (!xr_check(app.oxr.instance, result, "Failed to create session"))
-		return 1;
+		return (void *)1;
 
 	printf("Successfully created a session with OpenGL!\n");
 
@@ -1882,7 +1913,7 @@ void *main_loop(void* arg)
 
 	result = xrCreateReferenceSpace(app.oxr.session, &play_space_create_info, &app.oxr.play_space);
 	if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-		return 1;
+		return (void *)1;
 
 
 	XrPosef y1 = {.position = {0, 1, 0}, .orientation = {0, 0, 0, 1}};
@@ -1898,7 +1929,7 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_local_space);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 	{
 		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -1909,7 +1940,7 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_local_space_y1);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 	{
 		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -1920,7 +1951,7 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_stage_space);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 	{
 		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -1931,7 +1962,7 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_stage_space_y1);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 	{
 		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -1942,7 +1973,7 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_view_space);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 	{
 		XrReferenceSpaceCreateInfo space_create_info = {.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -1953,21 +1984,21 @@ void *main_loop(void* arg)
 
 		result = xrCreateReferenceSpace(app.oxr.session, &space_create_info, &app.ref_view_space_z1);
 		if (!xr_check(app.oxr.instance, result, "Failed to create play space!"))
-			return 1;
+			return (void *)1;
 	}
 
 	// --- Create Swapchains
 	uint32_t swapchain_format_count;
 	result = xrEnumerateSwapchainFormats(app.oxr.session, 0, &swapchain_format_count, NULL);
 	if (!xr_check(app.oxr.instance, result, "Failed to get number of supported swapchain formats"))
-		return 1;
+		return (void *)1;
 
 	printf("Runtime supports %d swapchain formats\n", swapchain_format_count);
 	int64_t swapchain_formats[swapchain_format_count];
 	result = xrEnumerateSwapchainFormats(app.oxr.session, swapchain_format_count,
 	                                     &swapchain_format_count, swapchain_formats);
 	if (!xr_check(app.oxr.instance, result, "Failed to enumerate swapchain formats"))
-		return 1;
+		return (void *)1;
 
 	// SRGB is usually a better choice than linear
 	// a more sophisticated approach would iterate supported swapchain formats and choose from them
@@ -1990,20 +2021,20 @@ void *main_loop(void* arg)
 	if (!create_swapchain_from_views(app.oxr.instance, app.oxr.session,
 	                                 &vr_swapchains[SWAPCHAIN_PROJECTION], app.oxr.view_count,
 	                                 color_format, app.oxr.viewconfig_views, color_flags))
-		return 1;
+		return (void *)1;
 
 	if (app.ext.depth.base.supported) {
 		XrSwapchainUsageFlags depth_flags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		if (!create_swapchain_from_views(app.oxr.instance, app.oxr.session,
 		                                 &vr_swapchains[SWAPCHAIN_DEPTH], app.oxr.view_count,
 		                                 depth_format, app.oxr.viewconfig_views, depth_flags)) {
-			return 1;
+			return (void *)1;
 		}
 	}
 
 	if (!create_one_swapchain(app.oxr.instance, app.oxr.session, &quad_layer.swapchain, quad_format,
 	                          1, quad_layer.pixel_width, quad_layer.pixel_height, color_flags))
-		return 1;
+		return (void *)1;
 
 	// Do not allocate these every frame to save some resources
 	app.oxr.views = (XrView*)malloc(sizeof(XrView) * app.oxr.view_count);
@@ -2062,7 +2093,7 @@ void *main_loop(void* arg)
 		result = app.ext.refresh_rate.xrEnumerateDisplayRefreshRatesFB(app.oxr.session, 0,
 		                                                               &refresh_rate_count, NULL);
 		if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rate count"))
-			return 1;
+			return (void *)1;
 
 		if (refresh_rate_count > 0) {
 			float* refresh_rates = malloc(sizeof(float) * refresh_rate_count);
@@ -2070,7 +2101,7 @@ void *main_loop(void* arg)
 			    app.oxr.session, refresh_rate_count, &refresh_rate_count, refresh_rates);
 			if (!xr_check(app.oxr.instance, result, "failed to enumerate refresh rates")) {
 				free(refresh_rates);
-				return 1;
+				return (void *)1;
 			}
 
 			printf("Supported refresh rates:\n");
@@ -2084,7 +2115,7 @@ void *main_loop(void* arg)
 			    app.oxr.session, refresh_rates[refresh_rate_count - 1]);
 			if (!xr_check(app.oxr.instance, result, "failed to request refresh rate %f",
 			              refresh_rates[refresh_rate_count - 1]))
-				return 1;
+				return (void *)1;
 
 			free(refresh_rates);
 		}
@@ -2092,7 +2123,7 @@ void *main_loop(void* arg)
 		float refresh_rate = 0;
 		result = app.ext.refresh_rate.xrGetDisplayRefreshRateFB(app.oxr.session, &refresh_rate);
 		if (!xr_check(app.oxr.instance, result, "failed to get refresh rate"))
-			return 1;
+			return (void *)1;
 
 		printf("Current refresh rate: %f Hz\n", refresh_rate);
 	}
@@ -2110,7 +2141,7 @@ void *main_loop(void* arg)
 	XrActionSet gameplay_actionset;
 	result = xrCreateActionSet(app.oxr.instance, &gameplay_actionset_info, &gameplay_actionset);
 	if (!xr_check(app.oxr.instance, result, "failed to create actionset"))
-		return 1;
+		return (void *)1;
 
 
 	// Grabbing objects is not actually implemented in this demo, it only gives some  haptic feebdack.
@@ -2118,7 +2149,7 @@ void *main_loop(void* arg)
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "grabobjectfloat", "Grab Object",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.grab_action))
-		return 1;
+		return (void *)1;
 
 
 	// A 1D action that is fed by one axis of a 2D input (y axis of thumbstick).
@@ -2126,39 +2157,39 @@ void *main_loop(void* arg)
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_FLOAT_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_FLOAT_INPUT, "accelerate", "Accelerate",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.accelerate_action))
-		return 1;
+		return (void *)1;
 
 	app.hand_pose_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "handpose", "Hand Pose",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.hand_pose_action))
-		return 1;
+		return (void *)1;
 	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.hand_pose_action, hand_paths,
 	                         HAND_COUNT))
-		return 1;
+		return (void *)1;
 
 	app.aim_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_POSE_INPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_POSE_INPUT, "aim", "Aim Pose",
 	                   gameplay_actionset, HAND_COUNT, hand_paths, &app.aim_action))
-		return 1;
+		return (void *)1;
 	if (!create_action_space(app.oxr.instance, app.oxr.session, &app.aim_action, hand_paths,
 	                         HAND_COUNT))
-		return 1;
+		return (void *)1;
 
 	app.haptic_action =
 	    (struct action_t){.action = XR_NULL_HANDLE, .action_type = XR_ACTION_TYPE_VIBRATION_OUTPUT};
 	if (!create_action(app.oxr.instance, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic",
 	                   "Haptic Vibration", gameplay_actionset, HAND_COUNT, hand_paths,
 	                   &app.haptic_action))
-		return 1;
+		return (void *)1;
 
 
 	// create an action for each role path regardless if we know a tracker with it yet
 	// because actions have to be created before the action set is attached to the session
 	if (app.ext.vive_tracker.base.supported &&
 	    !create_vive_role_trackers(app.oxr.instance, app.oxr.session, &app.ext, gameplay_actionset)) {
-		return 1;
+		return (void *)1;
 	}
 
 	if (app.ext.vive_tracker.base.supported) {
@@ -2185,7 +2216,7 @@ void *main_loop(void* arg)
 
 		if (!suggest_actions(app.oxr.instance, "/interaction_profiles/htc/vive_tracker_htcx",
 		                     vive_tracker_bindings, ARRAY_SIZE(vive_tracker_bindings)))
-			return 1;
+			return (void *)1;
 	}
 
 
@@ -2206,7 +2237,7 @@ void *main_loop(void* arg)
 	};
 	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/khr/simple_controller",
 	                     simple_bindings, ARRAY_SIZE(simple_bindings)))
-		return 1;
+		return (void *)1;
 
 
 	struct Binding touch_bindings[] = {
@@ -2225,7 +2256,7 @@ void *main_loop(void* arg)
 	};
 	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/oculus/touch_controller",
 	                     touch_bindings, ARRAY_SIZE(touch_bindings)))
-		return 1;
+		return (void *)1;
 
 	struct Binding index_bindings[] = {
 	    {.action = app.grab_action.action,
@@ -2246,7 +2277,7 @@ void *main_loop(void* arg)
 	};
 	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/valve/index_controller",
 	                     index_bindings, ARRAY_SIZE(index_bindings)))
-		return 1;
+		return (void *)1;
 
 
 	struct Binding vive_bindings[] = {
@@ -2265,11 +2296,11 @@ void *main_loop(void* arg)
 	};
 	if (!suggest_actions(app.oxr.instance, "/interaction_profiles/htc/vive_controller", vive_bindings,
 	                     ARRAY_SIZE(vive_bindings)))
-		return 1;
+		return (void *)1;
 
 	if (app.ext.hand_tracking.system_supported) {
 		if (!create_hand_trackers(app.oxr.instance, app.oxr.session, &app.ext.hand_tracking))
-			return 1;
+			return (void *)1;
 	}
 
 
@@ -2283,7 +2314,7 @@ void *main_loop(void* arg)
 		result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
 		    app.oxr.instance, 0, &vive_tracker_path_count, NULL);
 		if (!xr_check(app.oxr.instance, result, "failed to get vive tracker path count")) {
-			return 1;
+			return (void *)1;
 		}
 
 		if (vive_tracker_path_count > 0) {
@@ -2297,7 +2328,7 @@ void *main_loop(void* arg)
 		result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
 		    app.oxr.instance, vive_tracker_path_count, &vive_tracker_path_count, vive_tracker_paths);
 		if (!xr_check(app.oxr.instance, result, "failed to get vive tracker paths")) {
-			return 1;
+			return (void *)1;
 		}
 
 		printf("%d Vive tracker paths: ", vive_tracker_path_count);
@@ -2335,7 +2366,7 @@ void *main_loop(void* arg)
 	if (init_gl(app.oxr.view_count, vr_swapchains[SWAPCHAIN_PROJECTION].swapchain_lengths,
 	            &app.gl_renderer) != 0) {
 		printf("OpenGl setup failed!\n");
-		return 1;
+		return (void *)1;
 	}
 
 	XrSessionActionSetsAttachInfo actionset_attach_info = {
@@ -2345,18 +2376,25 @@ void *main_loop(void* arg)
 	    .actionSets = &gameplay_actionset};
 	result = xrAttachSessionActionSets(app.oxr.session, &actionset_attach_info);
 	if (!xr_check(app.oxr.instance, result, "failed to attach action set"))
-		return 1;
+		return (void *)1;
 
-
+	VR_initialized = 1;
 
 	uint64_t frame_count = 0;
 
 	bool quit_renderloop = false;
 	bool session_running = false; // to avoid beginning an already running app.oxr.session
 
+	struct timeval start_time_fps, end_time_fps;
+	struct timeval start_time_render_loop, end_time_render_loop;
+
+	// Record the start time
+    gettimeofday(&start_time_fps, NULL);
 
 	// RENDER LOOP
 	while (!quit_renderloop) {
+
+		gettimeofday(&start_time_render_loop, NULL);
 
 		// --- Poll SDL for events so we can exit with esc
 		SDL_Event sdl_event;
@@ -2432,7 +2470,7 @@ void *main_loop(void* arg)
 						                                             app.oxr.view_type};
 						result = xrBeginSession(app.oxr.session, &session_begin_info);
 						if (!xr_check(app.oxr.instance, result, "Failed to begin session!"))
-							return 1;
+							return (void *)1;
 						printf("Session started!\n");
 						session_running = true;
 					}
@@ -2447,7 +2485,7 @@ void *main_loop(void* arg)
 					if (session_running) {
 						result = xrEndSession(app.oxr.session);
 						if (!xr_check(app.oxr.instance, result, "Failed to end app.oxr.session!"))
-							return 1;
+							return (void *)1;
 						session_running = false;
 					}
 					skip_renderloop = true;
@@ -2459,7 +2497,7 @@ void *main_loop(void* arg)
 				case XR_SESSION_STATE_EXITING:
 					result = xrDestroySession(app.oxr.session);
 					if (!xr_check(app.oxr.instance, result, "Failed to destroy app.oxr.session!"))
-						return 1;
+						return (void *)1;
 					quit_renderloop = true;
 					skip_renderloop = true;
 					break; // app.oxr.state handling switch
@@ -2518,7 +2556,7 @@ void *main_loop(void* arg)
 						XrPath role_path;
 						result = xrStringToPath(app.oxr.instance, vive_tracker_role_str[i], &role_path);
 						if (!xr_check(app.oxr.instance, result, "failed to get vive tracker role path")) {
-							return 1;
+							return (void *)1;
 						}
 
 						XrResult res = xrGetCurrentInteractionProfile(app.oxr.session, role_path, &state);
@@ -2700,6 +2738,8 @@ void *main_loop(void* arg)
 			continue;
 		}
 
+
+
 		frame_count++;
 
 		// --- Wait for our turn to do head-pose dependent computation and render a frame
@@ -2747,7 +2787,7 @@ void *main_loop(void* arg)
 		while (t) {
 			if (!update_action_data(app.oxr.instance, app.oxr.session, &t->action, app.oxr.play_space,
 			                        frameState.predictedDisplayTime, false))
-				return 1;
+				return (void *)1;
 			if (t->action.states[0].pose_.isActive) {
 				// 				printf("Tracker with role %s: active %d %f, %f, %f\n", t->role_str,
 				// t->action.states[0].pose_.isActive, t->action.pose_locations[0].pose.position.x,
@@ -2768,7 +2808,7 @@ void *main_loop(void* arg)
 			result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
 			    app.oxr.instance, 0, &vive_tracker_path_count, NULL);
 			if (!xr_check(app.oxr.instance, result, "failed to get vive tracker path count")) {
-				return 1;
+				return (void *)1;
 			}
 
 			if (vive_tracker_path_count > 0) {
@@ -2782,7 +2822,7 @@ void *main_loop(void* arg)
 			result = app.ext.vive_tracker.pfnxrEnumerateViveTrackerPathsHTCX(
 			    app.oxr.instance, vive_tracker_path_count, &vive_tracker_path_count, vive_tracker_paths);
 			if (!xr_check(app.oxr.instance, result, "failed to get vive tracker paths")) {
-				return 1;
+				return (void *)1;
 			}
 
 			printf("%d Vive tracker paths: ", vive_tracker_path_count);
@@ -2812,6 +2852,7 @@ void *main_loop(void* arg)
 		}
 #endif
 
+		pthread_mutex_lock(&buffer_mutex);
 		for (int i = 0; i < HAND_COUNT; i++) {
 			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.hand_pose_action,
 			                        app.oxr.play_space, frameState.predictedDisplayTime,
@@ -2865,7 +2906,7 @@ void *main_loop(void* arg)
 				                  app.query_joint_velocities, &app.ext.hand_tracking, i);
 			}
 		};
-
+        pthread_mutex_unlock(&buffer_mutex);
 
 		if (app.cube.enabled) {
 			if (app.cube.pos_ts != 0) {
@@ -3022,7 +3063,22 @@ void *main_loop(void* arg)
 		result = xrEndFrame(app.oxr.session, &frameEndInfo);
 		if (!xr_check(app.oxr.instance, result, "failed to end frame!"))
 			break;
+
+		gettimeofday(&end_time_render_loop, NULL);
+
+		double loop_duration = (end_time_render_loop.tv_sec - start_time_render_loop.tv_sec) +
+							(end_time_render_loop.tv_usec - start_time_render_loop.tv_usec) / 1000000.0;
+		printf("Render loop duration: %f\n", loop_duration);
+
 	}
+
+	// Record the end time
+	gettimeofday(&end_time_fps, NULL);
+	float frame_rate = frame_count / ((end_time_fps.tv_sec - start_time_fps.tv_sec) +
+							(end_time_fps.tv_usec - start_time_fps.tv_usec) / 1000000.0);
+	printf("Frame rate: %f fps\n", frame_rate);
+
+	// sleep(0.1);
 
 
 
@@ -3609,7 +3665,7 @@ render_frame(struct ApplicationState* app,
 			// render_simple_cube(vec3(aim_vec.x, aim_vec.y, aim_vec.z), vec3(0.1, 0.1, 0.1),
 			// app->gl_renderer.modelLoc);
 		} else if (hand_location_valid && !aim_location_valid) {
-			printf("Hand location %d valid but not aim location\n", hand);
+			// printf("Hand location %d valid but not aim location\n", hand);
 		}
 
 
@@ -3708,8 +3764,8 @@ void update_texture(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad
 	// lock mutex
 	pthread_mutex_lock(&buffer_mutex);
 
-    // Frame is RGB
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)quad->pixel_width, (GLsizei)quad->pixel_height, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+    // Frame is BGR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)quad->pixel_width, (GLsizei)quad->pixel_height, 0, GL_BGR, GL_UNSIGNED_BYTE, buffer_in);
 
 	// unlock mutex
 	pthread_mutex_unlock(&buffer_mutex);
@@ -3738,10 +3794,12 @@ void render_quad(struct gl_renderer_t* gl_renderer, struct quad_layer_t* quad, u
 
 #endif
 
+
 // udp functions
 
 void *udp_receiver(void* arg) {
 
+	printf("UDP receiver thread started\n");
 
 	// set up UDP receiver
 	int sockfd;
@@ -3749,7 +3807,6 @@ void *udp_receiver(void* arg) {
 	struct sockaddr_in* client_addr = malloc(sizeof(struct sockaddr_in));
 	socklen_t addr_len = sizeof(*client_addr);
 	
-
 
     // Create the socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -3759,7 +3816,7 @@ void *udp_receiver(void* arg) {
 
     // Set the server address
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
+    server_addr.sin_port = htons(RECEIVER_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     // Bind socket to server address
@@ -3768,10 +3825,23 @@ void *udp_receiver(void* arg) {
         exit(EXIT_FAILURE);
     }
 
+	pthread_mutex_lock(&buffer_mutex);
+    while (!VR_initialized) {
+        pthread_mutex_unlock(&buffer_mutex);
+        // Sleep or perform other tasks while waiting
+        sleep(1);
+        pthread_mutex_lock(&buffer_mutex);
+    }
+    pthread_mutex_unlock(&buffer_mutex);
+
+
     printf("Waiting for data...\n");
 
+	struct timeval udp_receiver_start_time, udp_receiver_end_time;
 
 	while (1) {
+
+		gettimeofday(&udp_receiver_start_time, NULL);
     
         // Receive data
         GLubyte recv_buffer[MAX_BUFFER_SIZE];
@@ -3810,56 +3880,178 @@ void *udp_receiver(void* arg) {
             printf("Received data from %s:%d\n", inet_ntoa(((struct sockaddr_in*)client_addr)->sin_addr), ntohs(((struct sockaddr_in*)client_addr)->sin_port));
             printf("Texture info: width = %d, height = %d\n", textureInfo.width, textureInfo.height);
 
-			//printf("1\n");
             int total_bytes_expected = textureInfo.width * textureInfo.height * 3;
-            buffer = (GLubyte*)realloc(buffer, total_bytes_expected);
-            if (buffer == NULL) {
+            buffer_in = (GLubyte*)realloc(buffer_in, total_bytes_expected);
+			//buffer_in = (GLubyte*)realloc(buffer_in, 400000);
+            if (buffer_in == NULL) {
                 perror("realloc failed");
                 exit(EXIT_FAILURE);
             }
 
-			//printf("2\n");
             int total_bytes_received = 0;
             while (total_bytes_received < total_bytes_expected) {
-				//printf("2.1\n");
-                bytes_received = recvfrom(sockfd, recv_buffer, MIN(MAX_BUFFER_SIZE,total_bytes_expected-total_bytes_received), 0, (struct sockaddr *)client_addr, &addr_len);
+                // bytes_received = recvfrom(sockfd, recv_buffer, MIN(MAX_BUFFER_SIZE,total_bytes_expected-total_bytes_received), 0, (struct sockaddr *)client_addr, &addr_len);
+				bytes_received = recvfrom(sockfd, recv_buffer, MAX_BUFFER_SIZE, 0, (struct sockaddr *)client_addr, &addr_len);
                 if (bytes_received == -1) {
                     perror("recvfrom failed");
                     exit(EXIT_FAILURE);
                 }
-				//printf("2.2\n");
-				printf("Size of total_bytes_expected (buffer size): %d\n", total_bytes_expected);
+				GLuint frame_id = 0;
+				memcpy(&frame_id, recv_buffer, sizeof(GLuint));
+				
+				printf("prev_frame_id: %d\n", prev_frame_id);
+				printf("frame_id: %d\n", frame_id);
+				if (frame_id != prev_frame_id + 1) {
+					printf("Error: frame_id is not correct, skipping next 2 frames...\n");
+					skip_frame_count = 1;
+					break;
+				}
+				// if (skip_frame_count >= 1) {
+				// 	skip_frame_count += 1;
+				// 	break;
+				// }
+
+				printf("Size of total_bytes_expected (buffer_in size): %d\n", total_bytes_expected);
 				printf("Value of total_bytes_received: %d\n", total_bytes_received);
 				printf("Value of bytes_received: %d\n", bytes_received);
 				printf("\n");
 
-                memcpy(buffer + total_bytes_received, recv_buffer, bytes_received);
-				//printf("2.3\n");
-                total_bytes_received += bytes_received;
+                memcpy(buffer_in + total_bytes_received, recv_buffer + 4, bytes_received);
+                total_bytes_received += bytes_received - 4;
             }
             
+			if (skip_frame_count == 0) {
+				// After receiving all the data, check if you've received the expected amount of data
+				if (total_bytes_received != textureInfo.width * textureInfo.height * 3) {
+					printf("Error: Received %d bytes, expected %d bytes\n", total_bytes_received, textureInfo.width * textureInfo.height * 3);
+					free(buffer_in);
+					exit(EXIT_FAILURE);
+				} else {
+					printf("Received %d bytes\n", total_bytes_received);
+					buffer_in_size = total_bytes_received;
+				}
 
-			//printf("3\n");
-            // After receiving all the data, check if you've received the expected amount of data
-            if (total_bytes_received != textureInfo.width * textureInfo.height * 3) {
-                printf("Error: Received %d bytes, expected %d bytes\n", total_bytes_received, textureInfo.width * textureInfo.height * 3);
-                free(buffer);
-                exit(EXIT_FAILURE);
-            } else {
-                printf("Received %d bytes\n", total_bytes_received);
-                buffer_size = total_bytes_received;
-            }
+				prev_frame_id += 1;
+				printf("Received one frame!\n");
+
+			} else if (skip_frame_count == 1) {
+				prev_frame_id += 2;
+				skip_frame_count = 0;
+			}
+			// } else if (skip_frame_count == 2) {
+			// 	prev_frame_id += 1;
+			// 	skip_frame_count = 0;
+			//}
         }
-		printf("Received one frame!\n");
+
 
 		// unlock mutex
 		pthread_mutex_unlock(&buffer_mutex);
-	    }
+
+		gettimeofday(&udp_receiver_end_time, NULL);
+		double elapsed_time = (udp_receiver_end_time.tv_sec - udp_receiver_start_time.tv_sec) +
+                   (udp_receiver_end_time.tv_usec - udp_receiver_start_time.tv_usec) / 1000000.0;
+		printf("UDP receiver loop duration: %f\n", elapsed_time);
+
+	}
 
 	free(client_addr);
 
     return NULL;
 }
+
+
+// UDP sender thread function
+void* udp_sender(void* arg) {
+
+	printf("UDP sender thread started\n");
+    int sockfd;
+    struct sockaddr_in receiverAddr;
+
+    // Create UDP socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize receiver address
+    memset(&receiverAddr, 0, sizeof(receiverAddr));
+    receiverAddr.sin_family = AF_INET;
+    receiverAddr.sin_port = htons(SENDER_PORT);
+    if (inet_pton(AF_INET, RECEIVER_IP, &receiverAddr.sin_addr) != 1) {
+        perror("Invalid receiver IP address");
+        exit(EXIT_FAILURE);
+    }
+
+	// Initialize buffer_out
+	size_t buffer_out_size = HAND_COUNT * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
+	printf("Size of buffer_out: %lu\n", buffer_out_size);
+    buffer_out = (GLubyte*)malloc(buffer_out_size);
+
+    if (buffer_out == NULL) {
+        // Handle allocation failure
+        exit(EXIT_FAILURE);
+    }
+
+	pthread_mutex_lock(&buffer_mutex);
+    while (!VR_initialized) {
+        pthread_mutex_unlock(&buffer_mutex);
+        // Sleep or perform other tasks while waiting
+        sleep(1);
+        pthread_mutex_lock(&buffer_mutex);
+    }
+    pthread_mutex_unlock(&buffer_mutex);
+
+
+	struct timeval udp_sender_start_time, udp_sender_end_time;
+
+    while (1) {
+
+		gettimeofday(&udp_sender_start_time, NULL);
+
+		// Send jointBuffer over UDP
+		ssize_t bytesSent = sendto(sockfd, buffer_out, buffer_out_size, 0,
+								(const struct sockaddr*)&receiverAddr, sizeof(receiverAddr));
+
+		if (bytesSent == -1) {
+			perror("UDP sendto failed");
+			// Handle error as needed
+		} else {
+			printf("Sent %ld bytes\n", bytesSent);
+
+			for (size_t i = 0; i <  * HAND_COUNT; ++i) {
+				// Unpack the data using pointer arithmetic
+				int hand, joint_index;
+				float pose_x, pose_y, pose_z;
+
+				memcpy(&hand, buffer_out + i * XR_HAND_JOINT_COUNT_EXT, sizeof(int));
+				memcpy(&joint_index, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + sizeof(int), sizeof(int));
+				memcpy(&pose_x, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int), sizeof(float));
+				memcpy(&pose_y, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int) + sizeof(float), sizeof(float));
+				memcpy(&pose_z, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int) + 2 * sizeof(float), sizeof(float));
+
+				printf("Hand: %d, Joint Index: %d, Pose: (%f, %f, %f)\n", hand, joint_index, pose_x, pose_y, pose_z);
+			}
+		}
+
+		gettimeofday(&udp_sender_end_time, NULL);
+		double elapsed_time = (udp_sender_end_time.tv_sec - udp_sender_start_time.tv_sec) +
+                   (udp_sender_end_time.tv_usec - udp_sender_start_time.tv_usec) / 1000000.0;
+		printf("UDP sender loop duration: %f\n", elapsed_time);
+
+		sleep(1);
+	}
+
+	// Close the socket (not reached in this example)
+	close(sockfd);
+
+	return NULL;
+
+	free(buffer_out);
+}
+
+
+
 
 
 // Main function with threads	
@@ -3868,7 +4060,7 @@ int main(int argc, char** argv) {
 
 	pthread_mutex_init(&buffer_mutex, NULL);
 	
-	pthread_t mainLoopThreadId, udpReceiverThreadId;
+	pthread_t mainLoopThreadId, udpReceiverThreadId, udpSenderThreadId;
 
 	struct MainArgs mainArgs;
     mainArgs.argc = argc;
@@ -3884,9 +4076,15 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-	pthread_join(udpReceiverThreadId, NULL);
+	if (pthread_create(&udpSenderThreadId, NULL, udp_sender, NULL) != 0) {
+        perror("pthread_create for udp sender failed");
+        exit(EXIT_FAILURE);
+    }
 
-	pthread_join(mainLoopThreadId, NULL);
+	if (pthread_join(mainLoopThreadId, NULL) != 0) {
+		perror("pthread_join for main loop failed");
+		exit(EXIT_FAILURE);
+	}
 
 	pthread_mutex_destroy(&buffer_mutex);
 

@@ -21,55 +21,54 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
  /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h \
  /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
  /usr/include/x86_64-linux-gnu/bits/floatn.h \
- /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
- /usr/lib/gcc/x86_64-linux-gnu/11/include/stdbool.h /usr/include/getopt.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_ext.h /usr/include/pthread.h \
- /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/types/time_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h \
- /usr/include/x86_64-linux-gnu/bits/endian.h \
- /usr/include/x86_64-linux-gnu/bits/endianness.h \
- /usr/include/x86_64-linux-gnu/bits/sched.h \
- /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h \
- /usr/include/x86_64-linux-gnu/bits/cpu-set.h /usr/include/time.h \
- /usr/include/x86_64-linux-gnu/bits/time.h \
- /usr/include/x86_64-linux-gnu/bits/types/clock_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
- /usr/include/x86_64-linux-gnu/bits/types/clockid_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/timer_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
- /usr/include/x86_64-linux-gnu/bits/types/locale_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
- /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
- /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
- /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
- /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
- /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
- /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
- /usr/include/x86_64-linux-gnu/bits/setjmp.h \
- /usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h \
- /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h \
- /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
- /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h \
- /usr/include/GL/gl.h /usr/include/GL/glext.h \
- /usr/include/KHR/khrplatform.h \
- /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h /usr/include/stdint.h \
- /usr/include/x86_64-linux-gnu/bits/wchar.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
- /home/jarvis/thomas/LIS_VR_app/stb_image.h /usr/include/stdlib.h \
+ /usr/include/x86_64-linux-gnu/bits/floatn-common.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/waitflags.h \
  /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
- /usr/include/x86_64-linux-gnu/sys/types.h /usr/include/endian.h \
+ /usr/include/x86_64-linux-gnu/sys/types.h \
+ /usr/include/x86_64-linux-gnu/bits/types/clock_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/clockid_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/time_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/timer_t.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-intn.h /usr/include/endian.h \
+ /usr/include/x86_64-linux-gnu/bits/endian.h \
+ /usr/include/x86_64-linux-gnu/bits/endianness.h \
  /usr/include/x86_64-linux-gnu/bits/byteswap.h \
  /usr/include/x86_64-linux-gnu/bits/uintn-identity.h \
  /usr/include/x86_64-linux-gnu/sys/select.h \
  /usr/include/x86_64-linux-gnu/bits/select.h \
  /usr/include/x86_64-linux-gnu/bits/types/sigset_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h \
- /usr/include/alloca.h /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
- /usr/include/string.h /usr/include/strings.h \
- /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h \
+ /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
+ /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
+ /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
+ /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
+ /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
+ /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h /usr/include/alloca.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/stdbool.h /usr/include/getopt.h \
+ /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
+ /usr/include/x86_64-linux-gnu/bits/getopt_ext.h /usr/include/pthread.h \
+ /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/sched.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h \
+ /usr/include/x86_64-linux-gnu/bits/cpu-set.h /usr/include/time.h \
+ /usr/include/x86_64-linux-gnu/bits/time.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
+ /usr/include/x86_64-linux-gnu/bits/types/locale_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
+ /usr/include/x86_64-linux-gnu/bits/setjmp.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h \
+ /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
+ /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h \
+ /usr/include/x86_64-linux-gnu/sys/time.h /usr/include/GL/gl.h \
+ /usr/include/GL/glext.h /usr/include/KHR/khrplatform.h \
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h /usr/include/stdint.h \
+ /usr/include/x86_64-linux-gnu/bits/wchar.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+ /home/jarvis/thomas/LIS_VR_app/stb_image.h /usr/include/string.h \
+ /usr/include/strings.h /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h \
  /usr/include/limits.h /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
  /usr/include/x86_64-linux-gnu/bits/local_lim.h \
@@ -96,20 +95,22 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
  /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform.h \
  /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr.h \
  /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_reflection.h \
- /usr/include/SDL2/SDL.h /usr/include/SDL2/SDL_main.h \
- /usr/include/SDL2/SDL_stdinc.h /usr/include/SDL2/SDL_config.h \
- /usr/include/x86_64-linux-gnu/SDL2/_real_SDL_config.h \
- /usr/include/SDL2/SDL_platform.h /usr/include/SDL2/begin_code.h \
- /usr/include/SDL2/close_code.h /usr/include/wchar.h \
+ /usr/local/include/SDL2/SDL.h /usr/local/include/SDL2/SDL_main.h \
+ /usr/local/include/SDL2/SDL_stdinc.h \
+ /usr/local/include/SDL2/SDL_config.h \
+ /usr/local/include/SDL2/SDL_platform.h \
+ /usr/local/include/SDL2/begin_code.h \
+ /usr/local/include/SDL2/close_code.h /usr/include/wchar.h \
  /usr/include/x86_64-linux-gnu/bits/types/wint_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h \
  /usr/include/ctype.h /usr/lib/gcc/x86_64-linux-gnu/11/include/float.h \
- /usr/include/SDL2/SDL_assert.h /usr/include/SDL2/SDL_atomic.h \
- /usr/include/SDL2/SDL_platform.h /usr/include/SDL2/SDL_audio.h \
- /usr/include/SDL2/SDL_error.h /usr/include/SDL2/SDL_endian.h \
- /usr/include/SDL2/SDL_mutex.h /usr/include/SDL2/SDL_thread.h \
- /usr/include/SDL2/SDL_rwops.h /usr/include/SDL2/SDL_clipboard.h \
- /usr/include/SDL2/SDL_cpuinfo.h \
+ /usr/local/include/SDL2/SDL_assert.h \
+ /usr/local/include/SDL2/SDL_atomic.h /usr/local/include/SDL2/SDL_audio.h \
+ /usr/local/include/SDL2/SDL_error.h /usr/local/include/SDL2/SDL_endian.h \
+ /usr/local/include/SDL2/SDL_mutex.h /usr/local/include/SDL2/SDL_thread.h \
+ /usr/local/include/SDL2/SDL_rwops.h \
+ /usr/local/include/SDL2/SDL_clipboard.h \
+ /usr/local/include/SDL2/SDL_cpuinfo.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/immintrin.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/x86gprintrin.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/ia32intrin.h \
@@ -190,23 +191,31 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/amxbf16intrin.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/prfchwintrin.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/keylockerintrin.h \
- /usr/include/SDL2/SDL_events.h /usr/include/SDL2/SDL_video.h \
- /usr/include/SDL2/SDL_pixels.h /usr/include/SDL2/SDL_rect.h \
- /usr/include/SDL2/SDL_surface.h /usr/include/SDL2/SDL_blendmode.h \
- /usr/include/SDL2/SDL_keyboard.h /usr/include/SDL2/SDL_keycode.h \
- /usr/include/SDL2/SDL_scancode.h /usr/include/SDL2/SDL_mouse.h \
- /usr/include/SDL2/SDL_joystick.h /usr/include/SDL2/SDL_gamecontroller.h \
- /usr/include/SDL2/SDL_sensor.h /usr/include/SDL2/SDL_quit.h \
- /usr/include/SDL2/SDL_gesture.h /usr/include/SDL2/SDL_touch.h \
- /usr/include/SDL2/SDL_filesystem.h /usr/include/SDL2/SDL_haptic.h \
- /usr/include/SDL2/SDL_hidapi.h /usr/include/SDL2/SDL_hints.h \
- /usr/include/SDL2/SDL_loadso.h /usr/include/SDL2/SDL_log.h \
- /usr/include/SDL2/SDL_messagebox.h /usr/include/SDL2/SDL_metal.h \
- /usr/include/SDL2/SDL_power.h /usr/include/SDL2/SDL_render.h \
- /usr/include/SDL2/SDL_shape.h /usr/include/SDL2/SDL_system.h \
- /usr/include/SDL2/SDL_timer.h /usr/include/SDL2/SDL_version.h \
- /usr/include/SDL2/SDL_locale.h /usr/include/SDL2/SDL_misc.h \
- /usr/include/SDL2/SDL_events.h /usr/include/unistd.h \
+ /usr/local/include/SDL2/SDL_events.h /usr/local/include/SDL2/SDL_video.h \
+ /usr/local/include/SDL2/SDL_pixels.h /usr/local/include/SDL2/SDL_rect.h \
+ /usr/local/include/SDL2/SDL_surface.h \
+ /usr/local/include/SDL2/SDL_blendmode.h \
+ /usr/local/include/SDL2/SDL_keyboard.h \
+ /usr/local/include/SDL2/SDL_keycode.h \
+ /usr/local/include/SDL2/SDL_scancode.h \
+ /usr/local/include/SDL2/SDL_mouse.h \
+ /usr/local/include/SDL2/SDL_joystick.h \
+ /usr/local/include/SDL2/SDL_guid.h \
+ /usr/local/include/SDL2/SDL_gamecontroller.h \
+ /usr/local/include/SDL2/SDL_sensor.h /usr/local/include/SDL2/SDL_quit.h \
+ /usr/local/include/SDL2/SDL_gesture.h \
+ /usr/local/include/SDL2/SDL_touch.h \
+ /usr/local/include/SDL2/SDL_filesystem.h \
+ /usr/local/include/SDL2/SDL_haptic.h \
+ /usr/local/include/SDL2/SDL_hidapi.h /usr/local/include/SDL2/SDL_hints.h \
+ /usr/local/include/SDL2/SDL_loadso.h /usr/local/include/SDL2/SDL_log.h \
+ /usr/local/include/SDL2/SDL_messagebox.h \
+ /usr/local/include/SDL2/SDL_metal.h /usr/local/include/SDL2/SDL_power.h \
+ /usr/local/include/SDL2/SDL_render.h /usr/local/include/SDL2/SDL_shape.h \
+ /usr/local/include/SDL2/SDL_system.h /usr/local/include/SDL2/SDL_timer.h \
+ /usr/local/include/SDL2/SDL_version.h \
+ /usr/local/include/SDL2/SDL_locale.h /usr/local/include/SDL2/SDL_misc.h \
+ /usr/local/include/SDL2/SDL_events.h /usr/include/unistd.h \
  /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
  /usr/include/x86_64-linux-gnu/bits/environments.h \
  /usr/include/x86_64-linux-gnu/bits/confname.h \
