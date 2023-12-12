@@ -119,6 +119,7 @@ static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0
 #define SENDER_PORT 54321
 #define MAX_BUFFER_SIZE 65507
 #define SCALE 0.92
+#define JOINT_DEFAULT 1000.0
 
 typedef struct {
     int width;
@@ -136,7 +137,10 @@ size_t buffer_in_size = 0;
 GLuint prev_frame_id = 0;
 int skip_frame_count = 0;
 
+// flags
 int VR_initialized = 0;
+int data_ready = 0;
+int closing_app = 0;
 
 typedef struct {
 	int hand;
@@ -1515,10 +1519,10 @@ get_hand_tracking(XrInstance instance,
 				// Set to jointLocation.pose if the bit is set
 				joint.pose = jointLocation.pose.position;
 			} else {
-				// Set to default value (100.0f) if the bit is not set
-				joint.pose.x = 100.0f;
-				joint.pose.y = 100.0f;
-				joint.pose.z = 100.0f;
+				// Set to default value if the bit is not set
+				joint.pose.x = JOINT_DEFAULT;
+				joint.pose.y = JOINT_DEFAULT;
+				joint.pose.z = JOINT_DEFAULT;
 			}
 
 			// printf("Hand %d, joint %d: X=%f, Y=%f, Z=%f\n", joint.hand, joint.joint_index, joint.pose.x, joint.pose.y,
@@ -1527,10 +1531,8 @@ get_hand_tracking(XrInstance instance,
 			// Calculate the offset in the buffer for the current joint
 			size_t offset = jointIndex * sizeof(JointData) + hand * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
 
-			// printf("Offset: %lu\n", offset);
-
 			// Copy the JointLocation structure to the buffer
-			memcpy(&buffer_out[offset], &joint, sizeof(JointData));
+			memcpy(buffer_out + offset, &joint, sizeof(JointData));
 		}
 	}
 
@@ -2853,6 +2855,7 @@ void *main_loop(void* arg)
 #endif
 
 		pthread_mutex_lock(&buffer_mutex);
+		
 		for (int i = 0; i < HAND_COUNT; i++) {
 			if (!update_action_data(app.oxr.instance, app.oxr.session, &app.hand_pose_action,
 			                        app.oxr.play_space, frameState.predictedDisplayTime,
@@ -2906,6 +2909,8 @@ void *main_loop(void* arg)
 				                  app.query_joint_velocities, &app.ext.hand_tracking, i);
 			}
 		};
+
+		data_ready = 1;
         pthread_mutex_unlock(&buffer_mutex);
 
 		if (app.cube.enabled) {
@@ -3069,7 +3074,7 @@ void *main_loop(void* arg)
 		double loop_duration = (end_time_render_loop.tv_sec - start_time_render_loop.tv_sec) +
 							(end_time_render_loop.tv_usec - start_time_render_loop.tv_usec) / 1000000.0;
 		printf("Render loop duration: %f\n", loop_duration);
-
+		sleep(0.04);
 	}
 
 	// Record the end time
@@ -3078,11 +3083,10 @@ void *main_loop(void* arg)
 							(end_time_fps.tv_usec - start_time_fps.tv_usec) / 1000000.0);
 	printf("Frame rate: %f fps\n", frame_rate);
 
-	// sleep(0.1);
-
-
 
 	// --- Clean up after render loop quits
+	closing_app = 1;
+
 	for (uint32_t i = 0; i < app.oxr.view_count; i++) {
 		free(vr_swapchains[SWAPCHAIN_PROJECTION].images[i]);
 		if (app.ext.depth.base.supported) {
@@ -3916,7 +3920,7 @@ void *udp_receiver(void* arg) {
 				printf("Value of bytes_received: %d\n", bytes_received);
 				printf("\n");
 
-                memcpy(buffer_in + total_bytes_received, recv_buffer + 4, bytes_received);
+                memcpy(buffer_in + total_bytes_received, recv_buffer + 4, bytes_received); // skip the first 4 bytes for frame id
                 total_bytes_received += bytes_received - 4;
             }
             
@@ -3983,21 +3987,11 @@ void* udp_sender(void* arg) {
         exit(EXIT_FAILURE);
     }
 
-	// Initialize buffer_out
-	size_t buffer_out_size = HAND_COUNT * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
-	printf("Size of buffer_out: %lu\n", buffer_out_size);
-    buffer_out = (GLubyte*)malloc(buffer_out_size);
-
-    if (buffer_out == NULL) {
-        // Handle allocation failure
-        exit(EXIT_FAILURE);
-    }
-
 	pthread_mutex_lock(&buffer_mutex);
     while (!VR_initialized) {
         pthread_mutex_unlock(&buffer_mutex);
         // Sleep or perform other tasks while waiting
-        sleep(1);
+        usleep(100000);
         pthread_mutex_lock(&buffer_mutex);
     }
     pthread_mutex_unlock(&buffer_mutex);
@@ -4006,6 +4000,14 @@ void* udp_sender(void* arg) {
 	struct timeval udp_sender_start_time, udp_sender_end_time;
 
     while (1) {
+
+		if (data_ready == 0) {
+			continue;
+		}
+
+		pthread_mutex_lock(&buffer_mutex);
+
+		printf("Accessing buffer_out\n");
 
 		gettimeofday(&udp_sender_start_time, NULL);
 
@@ -4019,27 +4021,38 @@ void* udp_sender(void* arg) {
 		} else {
 			printf("Sent %ld bytes\n", bytesSent);
 
-			for (size_t i = 0; i <  * HAND_COUNT; ++i) {
+			// Printing coordinates to be sent
+			for (size_t i = 0; i <  XR_HAND_JOINT_COUNT_EXT * HAND_COUNT; ++i) {
 				// Unpack the data using pointer arithmetic
 				int hand, joint_index;
 				float pose_x, pose_y, pose_z;
 
-				memcpy(&hand, buffer_out + i * XR_HAND_JOINT_COUNT_EXT, sizeof(int));
-				memcpy(&joint_index, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + sizeof(int), sizeof(int));
-				memcpy(&pose_x, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int), sizeof(float));
-				memcpy(&pose_y, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int) + sizeof(float), sizeof(float));
-				memcpy(&pose_z, buffer_out + i * XR_HAND_JOINT_COUNT_EXT + 2 * sizeof(int) + 2 * sizeof(float), sizeof(float));
+				memcpy(&hand, buffer_out + i * sizeof(JointData), sizeof(int));
+				memcpy(&joint_index, buffer_out + i * sizeof(JointData) + sizeof(int), sizeof(int));
+				memcpy(&pose_x, buffer_out + i * sizeof(JointData) + 2 * sizeof(int), sizeof(float));
+				memcpy(&pose_y, buffer_out + i * sizeof(JointData) + 2 * sizeof(int) + sizeof(float), sizeof(float));
+				memcpy(&pose_z, buffer_out + i * sizeof(JointData) + 2 * sizeof(int) + 2 * sizeof(float), sizeof(float));
 
 				printf("Hand: %d, Joint Index: %d, Pose: (%f, %f, %f)\n", hand, joint_index, pose_x, pose_y, pose_z);
 			}
 		}
+
+		printf("Released buffer_out\n");
 
 		gettimeofday(&udp_sender_end_time, NULL);
 		double elapsed_time = (udp_sender_end_time.tv_sec - udp_sender_start_time.tv_sec) +
                    (udp_sender_end_time.tv_usec - udp_sender_start_time.tv_usec) / 1000000.0;
 		printf("UDP sender loop duration: %f\n", elapsed_time);
 
-		sleep(1);
+		data_ready = 0;
+
+		pthread_mutex_unlock(&buffer_mutex);
+
+		usleep(1000);
+
+		if (closing_app == 1) {
+			break;
+		}
 	}
 
 	// Close the socket (not reached in this example)
@@ -4047,7 +4060,6 @@ void* udp_sender(void* arg) {
 
 	return NULL;
 
-	free(buffer_out);
 }
 
 
@@ -4057,6 +4069,15 @@ void* udp_sender(void* arg) {
 // Main function with threads	
 
 int main(int argc, char** argv) {
+
+	// Initialize buffer_out
+	buffer_out_size = HAND_COUNT * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
+    buffer_out = (GLubyte*)malloc(buffer_out_size);
+
+    if (buffer_out == NULL) {
+        // Handle allocation failure
+        exit(EXIT_FAILURE);
+    }
 
 	pthread_mutex_init(&buffer_mutex, NULL);
 	
@@ -4085,6 +4106,8 @@ int main(int argc, char** argv) {
 		perror("pthread_join for main loop failed");
 		exit(EXIT_FAILURE);
 	}
+
+	free(buffer_out);
 
 	pthread_mutex_destroy(&buffer_mutex);
 

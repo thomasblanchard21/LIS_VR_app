@@ -20,17 +20,17 @@ def receive_data():
     try:
         while True:
             data, addr = sock.recvfrom(MAX_BUFFER_SIZE)
-            print(len(data))
 
             expected_size = NUM_HANDS * NUM_JOINTS * JOINT_DATA_SIZE
 
             if len(data) != expected_size:
                 print(f"Received data size ({len(data)}) does not match the expected size ({expected_size})")
                 continue
-   
-            for i in range(NUM_JOINTS * NUM_HANDS):
+
+            for i in range(NUM_JOINTS * NUM_HANDS): 
+
                 # Unpack the data using the format string
-                joint_data = struct.unpack("ii3f", data[i:i + JOINT_DATA_SIZE])
+                joint_data = struct.unpack("ii3f", data[i * JOINT_DATA_SIZE:(i+1) * JOINT_DATA_SIZE])
 
                 hand = joint_data[0]
                 joint_index = joint_data[1]
