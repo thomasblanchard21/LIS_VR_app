@@ -24,10 +24,6 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
-// Headers for loading images
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 // Required headers for windowing, as well as the XrGraphicsBindingOpenGLXlibKHR struct.
 #include <X11/Xlib.h>
 #include <GL/glx.h>
@@ -119,7 +115,7 @@ static XrPosef identity_pose = {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0
 #define SENDER_PORT 54321
 #define MAX_BUFFER_SIZE 65507
 #define SCALE 0.92
-#define JOINT_DEFAULT 1000.0
+#define JOINT_DEFAULT 100.0
 
 typedef struct {
     int width;
@@ -145,7 +141,7 @@ int closing_app = 0;
 typedef struct {
 	int hand;
 	int joint_index;
-    XrVector3f pose;
+    XrPosef pose;
 } JointData;
 
 GLubyte* buffer_out = NULL;
@@ -1517,16 +1513,22 @@ get_hand_tracking(XrInstance instance,
 			// Check if the bit corresponding to the joint location is set
 			if (jointLocation.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) {
 				// Set to jointLocation.pose if the bit is set
-				joint.pose = jointLocation.pose.position;
+				joint.pose = jointLocation.pose;
 			} else {
 				// Set to default value if the bit is not set
-				joint.pose.x = JOINT_DEFAULT;
-				joint.pose.y = JOINT_DEFAULT;
-				joint.pose.z = JOINT_DEFAULT;
+				joint.pose.position.x = JOINT_DEFAULT;
+				joint.pose.position.y = JOINT_DEFAULT;
+				joint.pose.position.z = JOINT_DEFAULT;
+				joint.pose.orientation.x = JOINT_DEFAULT;
+				joint.pose.orientation.y = JOINT_DEFAULT;
+				joint.pose.orientation.z = JOINT_DEFAULT;
+				joint.pose.orientation.w = JOINT_DEFAULT;
 			}
 
-			// printf("Hand %d, joint %d: X=%f, Y=%f, Z=%f\n", joint.hand, joint.joint_index, joint.pose.x, joint.pose.y,
-			//        joint.pose.z);
+			printf("Hand %d Joint %d: orientation (%f, %f, %f, %f), position (%f, %f, %f)\n",
+			       joint.hand, joint.joint_index, joint.pose.orientation.x, joint.pose.orientation.y,
+			       joint.pose.orientation.z, joint.pose.orientation.w, joint.pose.position.x,
+			       joint.pose.position.y, joint.pose.position.z);
 
 			// Calculate the offset in the buffer for the current joint
 			size_t offset = jointIndex * sizeof(JointData) + hand * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
@@ -4020,21 +4022,6 @@ void* udp_sender(void* arg) {
 			// Handle error as needed
 		} else {
 			printf("Sent %ld bytes\n", bytesSent);
-
-			// Printing coordinates to be sent
-			for (size_t i = 0; i <  XR_HAND_JOINT_COUNT_EXT * HAND_COUNT; ++i) {
-				// Unpack the data using pointer arithmetic
-				int hand, joint_index;
-				float pose_x, pose_y, pose_z;
-
-				memcpy(&hand, buffer_out + i * sizeof(JointData), sizeof(int));
-				memcpy(&joint_index, buffer_out + i * sizeof(JointData) + sizeof(int), sizeof(int));
-				memcpy(&pose_x, buffer_out + i * sizeof(JointData) + 2 * sizeof(int), sizeof(float));
-				memcpy(&pose_y, buffer_out + i * sizeof(JointData) + 2 * sizeof(int) + sizeof(float), sizeof(float));
-				memcpy(&pose_z, buffer_out + i * sizeof(JointData) + 2 * sizeof(int) + 2 * sizeof(float), sizeof(float));
-
-				printf("Hand: %d, Joint Index: %d, Pose: (%f, %f, %f)\n", hand, joint_index, pose_x, pose_y, pose_z);
-			}
 		}
 
 		printf("Released buffer_out\n");

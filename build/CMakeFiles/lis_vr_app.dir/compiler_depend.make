@@ -7,7 +7,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
   /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform.h \
   /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform_defines.h \
   /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_reflection.h \
-  /home/jarvis/thomas/LIS_VR_app/stb_image.h \
   /usr/include/GL/gl.h \
   /usr/include/GL/glext.h \
   /usr/include/GL/glx.h \
@@ -26,15 +25,12 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
   /usr/include/asm-generic/posix_types.h \
   /usr/include/asm-generic/socket.h \
   /usr/include/asm-generic/sockios.h \
-  /usr/include/assert.h \
   /usr/include/ctype.h \
   /usr/include/endian.h \
   /usr/include/features-time64.h \
   /usr/include/features.h \
   /usr/include/getopt.h \
   /usr/include/inttypes.h \
-  /usr/include/limits.h \
-  /usr/include/linux/limits.h \
   /usr/include/linux/posix_types.h \
   /usr/include/linux/stddef.h \
   /usr/include/math.h \
@@ -73,13 +69,10 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
   /usr/include/x86_64-linux-gnu/bits/in.h \
   /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
   /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
-  /usr/include/x86_64-linux-gnu/bits/local_lim.h \
   /usr/include/x86_64-linux-gnu/bits/long-double.h \
   /usr/include/x86_64-linux-gnu/bits/math-vector.h \
   /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h \
   /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
-  /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
   /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
   /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
   /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h \
@@ -191,7 +184,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/ia32intrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/immintrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/keylockerintrin.h \
-  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/lwpintrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/lzcntintrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h \
@@ -214,7 +206,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/stdbool.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h \
-  /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/tbmintrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/tmmintrin.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/tsxldtrkintrin.h \
@@ -303,19 +294,21 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/local/include/SDL2/SDL_sensor.h:
 
-/usr/local/include/SDL2/SDL_render.h:
+/usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
 
-/usr/local/include/SDL2/SDL_quit.h:
+/usr/lib/gcc/x86_64-linux-gnu/11/include/xsaveoptintrin.h:
 
-/usr/local/include/SDL2/SDL_power.h:
+/usr/include/x86_64-linux-gnu/bits/wordsize.h:
 
-/usr/local/include/SDL2/SDL_platform.h:
+/usr/include/x86_64-linux-gnu/bits/wchar.h:
 
-/usr/local/include/SDL2/SDL_mutex.h:
+/usr/include/x86_64-linux-gnu/bits/waitflags.h:
 
-/usr/local/include/SDL2/SDL_mouse.h:
+/usr/lib/gcc/x86_64-linux-gnu/11/include/enqcmdintrin.h:
 
-/usr/local/include/SDL2/SDL_misc.h:
+/usr/lib/gcc/x86_64-linux-gnu/11/include/fxsrintrin.h:
+
+/usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/wint_t.h:
 
@@ -328,6 +321,12 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/amxtileintrin.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
+
+/usr/include/X11/keysymdef.h:
+
+/usr/include/netinet/in.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
 
@@ -349,6 +348,8 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/asm-generic/socket.h:
 
+/usr/local/include/SDL2/SDL_mouse.h:
+
 /usr/include/x86_64-linux-gnu/bits/time.h:
 
 /usr/include/x86_64-linux-gnu/bits/select.h:
@@ -356,6 +357,8 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h:
 
 /usr/include/x86_64-linux-gnu/bits/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/time_t.h:
 
@@ -373,17 +376,11 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h:
 
+/usr/local/include/SDL2/SDL_atomic.h:
+
 /usr/include/x86_64-linux-gnu/bits/posix_opt.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/float.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
-
-/usr/local/include/SDL2/SDL_atomic.h:
-
-/usr/include/linux/limits.h:
-
-/usr/include/X11/Xlib.h:
 
 /usr/include/x86_64-linux-gnu/bits/struct_mutex.h:
 
@@ -396,8 +393,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:
 
 /usr/include/x86_64-linux-gnu/bits/math-vector.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
 
@@ -415,25 +410,19 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/x86_64-linux-gnu/bits/getopt_ext.h:
 
-/usr/include/x86_64-linux-gnu/bits/floatn.h:
+/usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
-/usr/include/x86_64-linux-gnu/bits/environments.h:
+/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform_defines.h:
 
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
+/usr/include/getopt.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/amxbf16intrin.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/timer_t.h:
 
-/usr/include/X11/keysymdef.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
-
-/usr/include/netinet/in.h:
-
 /home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_reflection.h:
 
-/usr/local/include/SDL2/SDL_pixels.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/gfniintrin.h:
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
 
 /usr/include/arpa/inet.h:
 
@@ -451,9 +440,13 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/clflushoptintrin.h:
 
+/usr/local/include/SDL2/SDL_render.h:
+
 /usr/local/include/SDL2/SDL_surface.h:
 
 /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
+
+/usr/include/features-time64.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
 
@@ -473,33 +466,19 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/stdc-predef.h:
 
-/usr/include/x86_64-linux-gnu/bits/posix1_lim.h:
+/usr/include/x86_64-linux-gnu/bits/fp-fast.h:
 
-/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform.h:
-
-/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr.h:
-
-/usr/local/include/SDL2/SDL_rect.h:
-
-/usr/include/stdint.h:
-
-/usr/include/endian.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/avx2intrin.h:
-
-/usr/local/include/SDL2/SDL_haptic.h:
-
-/usr/include/pthread.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/avx512vbmivlintrin.h:
+/usr/include/X11/Xlib.h:
 
 /usr/include/X11/Xosdefs.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h:
 
-/usr/include/asm-generic/bitsperlong.h:
+/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform.h:
 
-/usr/include/x86_64-linux-gnu/bits/types/sigset_t.h:
+/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr.h:
+
+/usr/local/include/SDL2/SDL_haptic.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/ia32intrin.h:
 
@@ -507,9 +486,7 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/avxintrin.h:
 
-/home/jarvis/thomas/LIS_VR_app/openxr_headers/openxr_platform_defines.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
+/usr/include/x86_64-linux-gnu/bits/floatn.h:
 
 /usr/include/x86_64-linux-gnu/bits/floatn-common.h:
 
@@ -525,9 +502,9 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
 
-/usr/include/GL/glx.h:
+/usr/include/x86_64-linux-gnu/bits/types.h:
 
-/usr/include/KHR/khrplatform.h:
+/usr/lib/gcc/x86_64-linux-gnu/11/include/bmiintrin.h:
 
 /usr/include/X11/X.h:
 
@@ -535,37 +512,25 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/avx512ifmavlintrin.h:
 
+/usr/include/KHR/khrplatform.h:
+
+/usr/include/pthread.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/avx512vbmivlintrin.h:
+
+/usr/include/features.h:
+
+/usr/local/include/SDL2/SDL_platform.h:
+
 /usr/include/X11/Xfuncproto.h:
 
 /usr/include/stdio.h:
 
-/usr/include/features.h:
+/usr/include/GL/glx.h:
 
-/usr/include/getopt.h:
+/usr/include/x86_64-linux-gnu/bits/types/sigset_t.h:
 
-/usr/lib/gcc/x86_64-linux-gnu/11/include/amxbf16intrin.h:
-
-/usr/include/x86_64-linux-gnu/bits/fp-fast.h:
-
-/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
-
-/usr/include/limits.h:
-
-/usr/include/x86_64-linux-gnu/bits/timesize.h:
-
-/usr/include/x86_64-linux-gnu/bits/time64.h:
-
-/usr/local/include/SDL2/SDL_loadso.h:
-
-/usr/local/include/SDL2/SDL_assert.h:
-
-/usr/include/x86_64-linux-gnu/bits/getopt_core.h:
-
-/usr/include/x86_64-linux-gnu/sys/select.h:
-
-/usr/include/x86_64-linux-gnu/asm/socket.h:
-
-/usr/include/stdlib.h:
+/usr/include/asm-generic/bitsperlong.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
 
@@ -575,7 +540,13 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/x86_64-linux-gnu/bits/socket_type.h:
 
-/home/jarvis/thomas/LIS_VR_app/stb_image.h:
+/usr/include/endian.h:
+
+/usr/include/stdint.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/avx2intrin.h:
+
+/usr/local/include/SDL2/SDL_rect.h:
 
 /usr/include/x86_64-linux-gnu/gnu/stubs.h:
 
@@ -586,6 +557,12 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/sched.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/f16cintrin.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/sys/select.h:
+
+/usr/include/x86_64-linux-gnu/asm/socket.h:
 
 /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
 
@@ -599,9 +576,19 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h:
 
-/usr/include/math.h:
+/usr/include/x86_64-linux-gnu/bits/timesize.h:
+
+/usr/include/x86_64-linux-gnu/bits/time64.h:
+
+/usr/local/include/SDL2/SDL_loadso.h:
+
+/usr/local/include/SDL2/SDL_assert.h:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_core.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
+
+/usr/include/math.h:
 
 /usr/include/x86_64-linux-gnu/asm/sockios.h:
 
@@ -610,6 +597,8 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/uintrintrin.h:
+
+/usr/include/x86_64-linux-gnu/bits/environments.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h:
 
@@ -620,24 +609,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/include/x86_64-linux-gnu/asm/posix_types_64.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/avx512ifmaintrin.h:
-
-/usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitflags.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/enqcmdintrin.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/fxsrintrin.h:
-
-/usr/include/x86_64-linux-gnu/bits/types.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/bmiintrin.h:
-
-/usr/include/x86_64-linux-gnu/bits/wordsize.h:
-
-/usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/xsaveoptintrin.h:
 
 /usr/include/x86_64-linux-gnu/sys/time.h:
 
@@ -715,6 +686,10 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/avx512vpopcntdqvlintrin.h:
 
+/usr/lib/gcc/x86_64-linux-gnu/11/include/gfniintrin.h:
+
+/usr/local/include/SDL2/SDL_pixels.h:
+
 /usr/lib/gcc/x86_64-linux-gnu/11/include/bmi2intrin.h:
 
 /usr/local/include/SDL2/SDL_blendmode.h:
@@ -739,29 +714,23 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/hresetintrin.h:
 
-/usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/mwaitintrin.h:
-
 /usr/lib/gcc/x86_64-linux-gnu/11/include/lwpintrin.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/lzcntintrin.h:
 
-/usr/include/x86_64-linux-gnu/bits/sockaddr.h:
-
 /usr/local/include/SDL2/SDL_audio.h:
 
+/usr/include/x86_64-linux-gnu/bits/sockaddr.h:
+
 /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/mwaitintrin.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/pmmintrin.h:
 
 /usr/local/include/SDL2/SDL_guid.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/popcntintrin.h:
-
-/usr/include/features-time64.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h:
 
@@ -779,9 +748,9 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/sgxintrin.h:
 
-/usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h:
+/usr/local/include/SDL2/SDL_power.h:
 
-/usr/include/x86_64-linux-gnu/bits/local_lim.h:
+/usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/stdbool.h:
 
@@ -804,8 +773,6 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/lib/gcc/x86_64-linux-gnu/11/include/xsavecintrin.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/xsaveintrin.h:
-
-/usr/include/assert.h:
 
 /usr/local/include/SDL2/SDL_clipboard.h:
 
@@ -842,3 +809,9 @@ CMakeFiles/lis_vr_app.dir/main.c.o: /home/jarvis/thomas/LIS_VR_app/main.c \
 /usr/local/include/SDL2/SDL_messagebox.h:
 
 /usr/local/include/SDL2/SDL_metal.h:
+
+/usr/local/include/SDL2/SDL_misc.h:
+
+/usr/local/include/SDL2/SDL_mutex.h:
+
+/usr/local/include/SDL2/SDL_quit.h:
