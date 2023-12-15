@@ -15,51 +15,21 @@ NUM_HANDS = 2
 DISPLAY_COUNT = 3  # Display once every 3 batches
 
 
-def visualize_joints(ax, joint_data):
-    # Clear the previous plot
-    ax.cla()
-
-    joint_data = joint_data[(0,1,3,5,7,8,10,12,13,15,17,18,20,22,23,25, 26,27,29,31,33,34,36,38,39,41,43,44,46,48,50,51), :] # Remove some joints
-
-    # Extract x, y, and z coordinates
-    x_coords = joint_data['pos_x']
-    y_coords = joint_data['pos_y']
-    z_coords = joint_data['pos_z']
-
-    # Plot the joints
-    ax.scatter(x_coords, y_coords, z_coords, c='r', marker='o')
-
-    # Label axes
-    ax.set_xlabel('X Axis')
-    ax.set_ylabel('Y Axis')
-    ax.set_zlabel('Z Axis')
-
-    # Invert axes
-    ax.invert_xaxis()
-    ax.invert_yaxis()
-    ax.invert_zaxis()
-    
-    # Set axis limits
-    ax.set_xlim([min(x_coords), max(x_coords)])
-    ax.set_ylim([min(y_coords), max(y_coords)])
-    ax.set_zlim([min(z_coords), max(z_coords)])
 
 def compute_grasp(joint_data):
     # Compute the grasp
-    grasp_left = 0.0
-    grasp_right = 0.0
+    grasp_left, grasp_right = 0.0, 0.0
 
     for i in range(1,6):
         for j in range (i+1,6):
             grasp_left += compute_distance(joint_data[5*i], joint_data[5*j]) / 10 # compute distance between tips of fingers i and j
             grasp_right += compute_distance(joint_data[5*i+NUM_JOINTS], joint_data[5*j+NUM_JOINTS]) / 10
 
-    return grasp_left, grasp_right
+    return grasp_left[0], grasp_right[0]
 
 def compute_distance(joint1, joint2):
     # Compute the distance between two joints
     return np.sqrt((joint1['pos_x'] - joint2['pos_x'])**2 + (joint1['pos_y'] - joint2['pos_y'])**2 + (joint1['pos_z'] - joint2['pos_z'])**2)
-
 
 # Relative position of fingertips to the palm
 def quaternion_to_rotation_matrix(quaternion):
@@ -75,6 +45,25 @@ def quaternion_to_rotation_matrix(quaternion):
     ])
 
     return rotation_matrix
+
+def quaternion_to_euler(quaternion):
+    # Assuming quaternion is in the order (x, y, z, w)
+    x, y, z, w = quaternion
+
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x**2 + y**2)
+    roll = np.arctan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch = np.arcsin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y**2 + z**2)
+    yaw = np.arctan2(t3, t4)
+
+    return roll, pitch, yaw
 
 def compute_relative_position(palm_position, tip_position, finger_orientation):
 
@@ -114,7 +103,6 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection='3d')
 
     try:
-        batch_counter = 0   # for visualization
 
         while True:
             data, addr = sock.recvfrom(MAX_BUFFER_SIZE)
@@ -127,15 +115,22 @@ if __name__ == "__main__":
 
             # Unpack the simulation time
             sim_time = struct.unpack('d', data[:struct.calcsize('d')])[0]
-            print(f"Simulation time: {sim_time}")
+            # print(f"Simulation time: {sim_time}")
 
             # Unpack the data using the format string and reshape it into a structured array
             joint_data = np.frombuffer(data[struct.calcsize('d'):], dtype=hand_data).reshape((NUM_JOINTS * NUM_HANDS, 1))
 
+            # Compute the grasp
             grasp_left, grasp_right = compute_grasp(joint_data)
-            print(f"Grasp left: {grasp_left[0]}")
-            print(f"Grasp right: {grasp_right[0]}")
+            if grasp_left == 0.0:
+                grasp_left = np.nan
+            if grasp_right == 0.0:
+                grasp_right = np.nan
 
+            # print(f"Grasp left: {grasp_left}")
+            # print(f"Grasp right: {grasp_right}")
+
+            # Convert the structured array into a Pandas DataFrame
             joint_data = pd.DataFrame(joint_data.flatten(), columns=['hand', 'joint_index', 'ori_x', 'ori_y', 'ori_z', 'ori_w', 'pos_x', 'pos_y', 'pos_z'])
             joint_data.replace(100, np.nan, inplace=True)   # Replace 100 with NaN
 
@@ -149,42 +144,32 @@ if __name__ == "__main__":
                 x['ori_x':'ori_w'].values
             ), axis=1).to_list(), columns=['pos_x', 'pos_y', 'pos_z'], index=joint_data.index)
 
-            print(joint_data)
+            # ----------------------------------------------------------------------------------------------
+            #
+            # OUTPUT DATA:
+            #
+            # Output data is a list with the following elements:
+            #
+            #   - sim_time: simulation time (double)
+            #
+            #   - joint_data: Pandas DataFrame with the following columns:
+            #       - hand: 0 for left hand, 1 for right hand
+            #       - joint_index: 0 for palm, 5 for thumb, 10 for index finger, 15 for middle finger, 20 for ring finger, 25 for pinky
+            #       - ori_x, ori_y, ori_z, ori_w: orientation of the joint in quaternion form
+            #       - pos_x, pos_y, pos_z: relative position of the joint to the palm, absolute position for the palm
+            #
+            #   - grasp_left: grasp value for the left hand (float)
+            #   - grasp_right: grasp value for the right hand (float)
+            #
+            # ---------------------------------------------------------------------------------------------
 
-
-                
-
-
-            batch_counter += 1
-
-            # if batch_counter == DISPLAY_COUNT:
-            #     visualize_joints(ax, joint_data)
-            #     plt.draw()
-            #     plt.pause(0.02)
-            #     batch_counter = 0  # Reset the counter
-
-            # # Keeping only 3D position of palm and fingertips, orientation of palm and grasp for each hand
-            # output_data = []
-
-            # # Left hand
-            # for i in (0,5,10,15,20,25):
-            #     output_data.append(joint_data[i][0]['pos_x'])
-            #     output_data.append(joint_data[i][0]['pos_y'])
-            #     output_data.append(joint_data[i][0]['pos_z'])
-            # output_data.append(joint_data[0][0]['ori_x'])
-            # output_data.append(joint_data[0][0]['ori_y'])
-            # output_data.append(joint_data[0][0]['ori_z'])
-            # output_data.append(grasp_left[0])
-
-            # # Right hand
-            # for i in (26,31,36,41,46,51):
-            #     output_data.append(joint_data[i][0]['pos_x'])
-            #     output_data.append(joint_data[i][0]['pos_y'])
-            #     output_data.append(joint_data[i][0]['pos_z'])
-            # output_data.append(joint_data[26][0]['ori_x'])
-            # output_data.append(joint_data[26][0]['ori_y'])
-            # output_data.append(joint_data[26][0]['ori_z'])
-            # output_data.append(grasp_right[0])
+            output_data = []
+            output_data.append(sim_time)
+            output_data.append(joint_data)
+            output_data.append(grasp_left)
+            output_data.append(grasp_right)
+            
+            print(output_data)
 
     finally:
         sock.close()

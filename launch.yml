@@ -22,7 +22,7 @@ windows:
 
       # Open main app
       - shell_command:
-        - sleep 5
+        - sleep 7
         - cd build
         - cmake --build .
         - ./lis_vr_app
