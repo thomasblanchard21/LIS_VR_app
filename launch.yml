@@ -1,0 +1,31 @@
+session_name: launch_vr
+windows:
+  - window_name: window 1
+    layout: tiled
+    shell_command_before:
+      - tmux set -g mouse on
+    panes:
+
+      # Open a pane and then start the simulation
+      - shell_command:
+        - cd ~/ros2_ws
+        - source install/local_setup.bash
+        - ros2 launch crazyflie_webots_sim robot_launch.py
+
+      # Open monado
+      - shell_command:
+        - xrandr --output DP-2 --set non-desktop 1
+        - monado-service
+
+      # Open UDP receiver
+      - python3 udp_receiver.py
+
+      # Open main app
+      - shell_command:
+        - sleep 5
+        - cd build
+        - cmake --build .
+        - ./lis_vr_app
+
+
+  

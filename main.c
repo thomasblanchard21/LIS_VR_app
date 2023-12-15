@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <time.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -146,6 +147,10 @@ typedef struct {
 
 GLubyte* buffer_out = NULL;
 size_t buffer_out_size = 0;
+
+
+int flag = 0;
+clock_t start_time, current_time;
 
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1525,13 +1530,16 @@ get_hand_tracking(XrInstance instance,
 				joint.pose.orientation.w = JOINT_DEFAULT;
 			}
 
-			printf("Hand %d Joint %d: orientation (%f, %f, %f, %f), position (%f, %f, %f)\n",
-			       joint.hand, joint.joint_index, joint.pose.orientation.x, joint.pose.orientation.y,
-			       joint.pose.orientation.z, joint.pose.orientation.w, joint.pose.position.x,
-			       joint.pose.position.y, joint.pose.position.z);
+
+			if (flag % 10 == 0) {
+				printf("Hand %d Joint %d: orientation (%f, %f, %f, %f), position (%f, %f, %f)\n",
+					joint.hand, joint.joint_index, joint.pose.orientation.x, joint.pose.orientation.y,
+					joint.pose.orientation.z, joint.pose.orientation.w, joint.pose.position.x,
+					joint.pose.position.y, joint.pose.position.z);
+			}
 
 			// Calculate the offset in the buffer for the current joint
-			size_t offset = jointIndex * sizeof(JointData) + hand * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
+			size_t offset = sizeof(double) + jointIndex * sizeof(JointData) + hand * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
 
 			// Copy the JointLocation structure to the buffer
 			memcpy(buffer_out + offset, &joint, sizeof(JointData));
@@ -2912,6 +2920,7 @@ void *main_loop(void* arg)
 			}
 		};
 
+		flag += 1;
 		data_ready = 1;
         pthread_mutex_unlock(&buffer_mutex);
 
@@ -3075,7 +3084,7 @@ void *main_loop(void* arg)
 
 		double loop_duration = (end_time_render_loop.tv_sec - start_time_render_loop.tv_sec) +
 							(end_time_render_loop.tv_usec - start_time_render_loop.tv_usec) / 1000000.0;
-		printf("Render loop duration: %f\n", loop_duration);
+		// printf("Render loop duration: %f\n", loop_duration);
 		sleep(0.04);
 	}
 
@@ -3843,7 +3852,7 @@ void *udp_receiver(void* arg) {
 
     printf("Waiting for data...\n");
 
-	struct timeval udp_receiver_start_time, udp_receiver_end_time;
+	struct timeval udp_receiver_start_time, udp_receiver_end_time;	
 
 	while (1) {
 
@@ -3917,10 +3926,10 @@ void *udp_receiver(void* arg) {
 				// 	break;
 				// }
 
-				printf("Size of total_bytes_expected (buffer_in size): %d\n", total_bytes_expected);
-				printf("Value of total_bytes_received: %d\n", total_bytes_received);
-				printf("Value of bytes_received: %d\n", bytes_received);
-				printf("\n");
+				// printf("Size of total_bytes_expected (buffer_in size): %d\n", total_bytes_expected);
+				// printf("Value of total_bytes_received: %d\n", total_bytes_received);
+				// printf("Value of bytes_received: %d\n", bytes_received);
+				// printf("\n");
 
                 memcpy(buffer_in + total_bytes_received, recv_buffer + 4, bytes_received); // skip the first 4 bytes for frame id
                 total_bytes_received += bytes_received - 4;
@@ -3933,12 +3942,12 @@ void *udp_receiver(void* arg) {
 					free(buffer_in);
 					exit(EXIT_FAILURE);
 				} else {
-					printf("Received %d bytes\n", total_bytes_received);
+					// printf("Received %d bytes\n", total_bytes_received);
 					buffer_in_size = total_bytes_received;
 				}
 
 				prev_frame_id += 1;
-				printf("Received one frame!\n");
+				// printf("Received one frame!\n");
 
 			} else if (skip_frame_count == 1) {
 				prev_frame_id += 2;
@@ -3957,7 +3966,7 @@ void *udp_receiver(void* arg) {
 		gettimeofday(&udp_receiver_end_time, NULL);
 		double elapsed_time = (udp_receiver_end_time.tv_sec - udp_receiver_start_time.tv_sec) +
                    (udp_receiver_end_time.tv_usec - udp_receiver_start_time.tv_usec) / 1000000.0;
-		printf("UDP receiver loop duration: %f\n", elapsed_time);
+		// printf("UDP receiver loop duration: %f\n", elapsed_time);
 
 	}
 
@@ -4001,17 +4010,27 @@ void* udp_sender(void* arg) {
 
 	struct timeval udp_sender_start_time, udp_sender_end_time;
 
+	double elapsed_time = 0.0;
+	start_time = clock();
+
     while (1) {
 
 		if (data_ready == 0) {
 			continue;
 		}
 
+		current_time = clock();
+		elapsed_time = (double)(current_time - start_time) / CLOCKS_PER_SEC;
+		// printf("Elapsed time: %f\n", elapsed_time);
+
 		pthread_mutex_lock(&buffer_mutex);
 
-		printf("Accessing buffer_out\n");
+		// printf("Accessing buffer_out\n");
 
 		gettimeofday(&udp_sender_start_time, NULL);
+
+		// Send time data first
+		memcpy(buffer_out, &elapsed_time, sizeof(double));
 
 		// Send jointBuffer over UDP
 		ssize_t bytesSent = sendto(sockfd, buffer_out, buffer_out_size, 0,
@@ -4021,15 +4040,15 @@ void* udp_sender(void* arg) {
 			perror("UDP sendto failed");
 			// Handle error as needed
 		} else {
-			printf("Sent %ld bytes\n", bytesSent);
+			// printf("Sent %ld bytes\n", bytesSent);
 		}
 
-		printf("Released buffer_out\n");
+		// printf("Released buffer_out\n");
 
 		gettimeofday(&udp_sender_end_time, NULL);
 		double elapsed_time = (udp_sender_end_time.tv_sec - udp_sender_start_time.tv_sec) +
                    (udp_sender_end_time.tv_usec - udp_sender_start_time.tv_usec) / 1000000.0;
-		printf("UDP sender loop duration: %f\n", elapsed_time);
+		// printf("UDP sender loop duration: %f\n", elapsed_time);
 
 		data_ready = 0;
 
@@ -4058,7 +4077,7 @@ void* udp_sender(void* arg) {
 int main(int argc, char** argv) {
 
 	// Initialize buffer_out
-	buffer_out_size = HAND_COUNT * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
+	buffer_out_size = sizeof(double) + HAND_COUNT * XR_HAND_JOINT_COUNT_EXT * sizeof(JointData);
     buffer_out = (GLubyte*)malloc(buffer_out_size);
 
     if (buffer_out == NULL) {

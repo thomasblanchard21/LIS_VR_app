@@ -1,13 +1,15 @@
 import socket
 import struct
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 RECEIVER_IP = "127.0.0.1"
 SENDER_PORT = 54321
 MAX_BUFFER_SIZE = 65507
-JOINT_DATA_SIZE = struct.calcsize("ii7f")
+FORMAT_STRING = "ii7f"
+JOINT_DATA_SIZE = struct.calcsize(FORMAT_STRING)
 NUM_JOINTS = 26
 NUM_HANDS = 2
 DISPLAY_COUNT = 3  # Display once every 3 batches
@@ -59,30 +61,39 @@ def compute_distance(joint1, joint2):
     return np.sqrt((joint1['pos_x'] - joint2['pos_x'])**2 + (joint1['pos_y'] - joint2['pos_y'])**2 + (joint1['pos_z'] - joint2['pos_z'])**2)
 
 
-## Relative position of fingertips to the palm, not used
+# Relative position of fingertips to the palm
+def quaternion_to_rotation_matrix(quaternion):
+    # Assuming quaternion is in the order (x, y, z, w)
+    q = np.array(quaternion)
+    q_norm = q / np.linalg.norm(q)
+    x, y, z, w = q_norm
 
-# def quaternion_to_rotation_matrix(quaternion):
-#     # Assuming quaternion is in the order (x, y, z, w)
-#     q = np.array(quaternion)
-#     q_norm = q / np.linalg.norm(q)
-#     x, y, z, w = q_norm
+    rotation_matrix = np.array([
+        [1 - 2*y**2 - 2*z**2, 2*x*y - 2*w*z, 2*x*z + 2*w*y],
+        [2*x*y + 2*w*z, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*w*x],
+        [2*x*z - 2*w*y, 2*y*z + 2*w*x, 1 - 2*x**2 - 2*y**2]
+    ])
 
-#     rotation_matrix = np.array([
-#         [1 - 2*y**2 - 2*z**2, 2*x*y - 2*w*z, 2*x*z + 2*w*y],
-#         [2*x*y + 2*w*z, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*w*x],
-#         [2*x*z - 2*w*y, 2*y*z + 2*w*x, 1 - 2*x**2 - 2*y**2]
-#     ])
+    return rotation_matrix
 
-#     return rotation_matrix
+def compute_relative_position(palm_position, tip_position, finger_orientation):
 
-# def compute_relative_position(palm_position, tip_position, finger_orientation):
-#     # Convert quaternion to a rotation matrix
-#     rotation_matrix = quaternion_to_rotation_matrix(finger_orientation)
+    # Check for NaN values
+    if(np.isnan(palm_position).any() or np.isnan(tip_position).any() or np.isnan(finger_orientation).any()):
+        return np.array([np.nan, np.nan, np.nan])
+    
+    # Return absolute position for palm
+    elif (palm_position == tip_position).all():
+        return palm_position
+    
+    else:
+        # Convert quaternion to a rotation matrix
+        rotation_matrix = quaternion_to_rotation_matrix(finger_orientation)
 
-#     # Compute the relative position using the formula
-#     relative_position = np.dot(rotation_matrix, (tip_position - palm_position))
+        # Compute the relative position using the formula
+        relative_position = np.dot(rotation_matrix, (tip_position - palm_position))
 
-#     return relative_position
+        return relative_position
 
 
 if __name__ == "__main__":
@@ -103,54 +114,77 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection='3d')
 
     try:
-        batch_counter = 0
+        batch_counter = 0   # for visualization
 
         while True:
             data, addr = sock.recvfrom(MAX_BUFFER_SIZE)
 
-            expected_size = NUM_HANDS * NUM_JOINTS * JOINT_DATA_SIZE
+            expected_size = NUM_HANDS * NUM_JOINTS * JOINT_DATA_SIZE + struct.calcsize('d')
 
             if len(data) != expected_size:
                 print(f"Received data size ({len(data)}) does not match the expected size ({expected_size})")
                 continue
 
+            # Unpack the simulation time
+            sim_time = struct.unpack('d', data[:struct.calcsize('d')])[0]
+            print(f"Simulation time: {sim_time}")
+
             # Unpack the data using the format string and reshape it into a structured array
-            joint_data = np.frombuffer(data, dtype=hand_data).reshape((NUM_JOINTS * NUM_HANDS, 1))
+            joint_data = np.frombuffer(data[struct.calcsize('d'):], dtype=hand_data).reshape((NUM_JOINTS * NUM_HANDS, 1))
 
             grasp_left, grasp_right = compute_grasp(joint_data)
-            # print(f"Grasp left: {grasp_left[0]}")
-            # print(f"Grasp right: {grasp_right[0]}")
+            print(f"Grasp left: {grasp_left[0]}")
+            print(f"Grasp right: {grasp_right[0]}")
+
+            joint_data = pd.DataFrame(joint_data.flatten(), columns=['hand', 'joint_index', 'ori_x', 'ori_y', 'ori_z', 'ori_w', 'pos_x', 'pos_y', 'pos_z'])
+            joint_data.replace(100, np.nan, inplace=True)   # Replace 100 with NaN
+
+            # Keep only palms and fingertips
+            joint_data = joint_data[joint_data['joint_index'].isin([0,5,10,15,20,25])]
+
+            # Compute relative position of fingertips to the palm
+            joint_data[['pos_x', 'pos_y', 'pos_z']] = pd.DataFrame(joint_data.apply(lambda x: compute_relative_position(
+                joint_data.loc[x['hand'] * NUM_JOINTS]['pos_x':'pos_z'].values,
+                x['pos_x':'pos_z'].values,
+                x['ori_x':'ori_w'].values
+            ), axis=1).to_list(), columns=['pos_x', 'pos_y', 'pos_z'], index=joint_data.index)
+
+            print(joint_data)
+
+
+                
+
 
             batch_counter += 1
 
-            if batch_counter == DISPLAY_COUNT:
-                visualize_joints(ax, joint_data)
-                plt.draw()
-                plt.pause(0.02)
-                batch_counter = 0  # Reset the counter
+            # if batch_counter == DISPLAY_COUNT:
+            #     visualize_joints(ax, joint_data)
+            #     plt.draw()
+            #     plt.pause(0.02)
+            #     batch_counter = 0  # Reset the counter
 
-            # Keeping only 3D position of palm and fingertips, orientation of palm and grasp for each hand
-            output_data = []
+            # # Keeping only 3D position of palm and fingertips, orientation of palm and grasp for each hand
+            # output_data = []
 
-            # Left hand
-            for i in (0,5,10,15,20,25):
-                output_data.append(joint_data[i][0]['pos_x'])
-                output_data.append(joint_data[i][0]['pos_y'])
-                output_data.append(joint_data[i][0]['pos_z'])
-            output_data.append(joint_data[0][0]['ori_x'])
-            output_data.append(joint_data[0][0]['ori_y'])
-            output_data.append(joint_data[0][0]['ori_z'])
-            output_data.append(grasp_left[0])
+            # # Left hand
+            # for i in (0,5,10,15,20,25):
+            #     output_data.append(joint_data[i][0]['pos_x'])
+            #     output_data.append(joint_data[i][0]['pos_y'])
+            #     output_data.append(joint_data[i][0]['pos_z'])
+            # output_data.append(joint_data[0][0]['ori_x'])
+            # output_data.append(joint_data[0][0]['ori_y'])
+            # output_data.append(joint_data[0][0]['ori_z'])
+            # output_data.append(grasp_left[0])
 
-            # Right hand
-            for i in (26,31,36,41,46,51):
-                output_data.append(joint_data[i][0]['pos_x'])
-                output_data.append(joint_data[i][0]['pos_y'])
-                output_data.append(joint_data[i][0]['pos_z'])
-            output_data.append(joint_data[26][0]['ori_x'])
-            output_data.append(joint_data[26][0]['ori_y'])
-            output_data.append(joint_data[26][0]['ori_z'])
-            output_data.append(grasp_right[0])
+            # # Right hand
+            # for i in (26,31,36,41,46,51):
+            #     output_data.append(joint_data[i][0]['pos_x'])
+            #     output_data.append(joint_data[i][0]['pos_y'])
+            #     output_data.append(joint_data[i][0]['pos_z'])
+            # output_data.append(joint_data[26][0]['ori_x'])
+            # output_data.append(joint_data[26][0]['ori_y'])
+            # output_data.append(joint_data[26][0]['ori_z'])
+            # output_data.append(grasp_right[0])
 
     finally:
         sock.close()
