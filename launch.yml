@@ -6,16 +6,17 @@ windows:
       - tmux set -g mouse on
     panes:
 
-      # Open a pane and then start the simulation
-      - shell_command:
-        - cd ~/ros2_ws
-        - source install/local_setup.bash
-        - ros2 launch crazyflie_webots_sim robot_launch.py
-
       # Open monado
       - shell_command:
         - xrandr --output DP-2 --set non-desktop 1
         - monado-service
+
+      # Open a pane and then start the simulation
+      - shell_command:
+        - sleep 10
+        - cd ~/ros2_ws
+        - source install/local_setup.bash
+        - ros2 launch crazyflie_webots_sim robot_launch.py
 
       # Open UDP receiver
       - python3 udp_receiver.py

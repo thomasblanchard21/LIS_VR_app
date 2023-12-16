@@ -96,15 +96,17 @@ if __name__ == "__main__":
     print(f"Listening on {RECEIVER_IP}:{SENDER_PORT}")
 
     # Define the dtype for the structured array
-    hand_data = np.dtype([('hand', np.int32), ('joint_index', np.int32), ('ori_x', np.float32), ('ori_y', np.float32), ('ori_z', np.float32), ('ori_w', np.float32), ('pos_x', np.float32), ('pos_y', np.float32), ('pos_z', np.float32)])
+    hand_data = np.dtype([('hand', np.int32), ('joint_index', np.int32), ('quat_x', np.float32), ('quat_y', np.float32), ('quat_z', np.float32), ('quat_w', np.float32), ('pos_x', np.float32), ('pos_y', np.float32), ('pos_z', np.float32)])
 
-    # Create a 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    output_data = pd.DataFrame()
+    frame_idx = 0
 
     try:
 
         while True:
+
+            frame_idx += 1
+
             data, addr = sock.recvfrom(MAX_BUFFER_SIZE)
 
             expected_size = NUM_HANDS * NUM_JOINTS * JOINT_DATA_SIZE + struct.calcsize('d')
@@ -131,7 +133,7 @@ if __name__ == "__main__":
             # print(f"Grasp right: {grasp_right}")
 
             # Convert the structured array into a Pandas DataFrame
-            joint_data = pd.DataFrame(joint_data.flatten(), columns=['hand', 'joint_index', 'ori_x', 'ori_y', 'ori_z', 'ori_w', 'pos_x', 'pos_y', 'pos_z'])
+            joint_data = pd.DataFrame(joint_data.flatten(), columns=['hand', 'joint_index', 'quat_x', 'quat_y', 'quat_z', 'quat_w', 'pos_x', 'pos_y', 'pos_z'])
             joint_data.replace(100, np.nan, inplace=True)   # Replace 100 with NaN
 
             # Keep only palms and fingertips
@@ -141,35 +143,39 @@ if __name__ == "__main__":
             joint_data[['pos_x', 'pos_y', 'pos_z']] = pd.DataFrame(joint_data.apply(lambda x: compute_relative_position(
                 joint_data.loc[x['hand'] * NUM_JOINTS]['pos_x':'pos_z'].values,
                 x['pos_x':'pos_z'].values,
-                x['ori_x':'ori_w'].values
+                x['quat_x':'quat_w'].values
             ), axis=1).to_list(), columns=['pos_x', 'pos_y', 'pos_z'], index=joint_data.index)
 
             # ----------------------------------------------------------------------------------------------
             #
             # OUTPUT DATA:
             #
-            # Output data is a list with the following elements:
             #
-            #   - sim_time: simulation time (double)
-            #
-            #   - joint_data: Pandas DataFrame with the following columns:
-            #       - hand: 0 for left hand, 1 for right hand
-            #       - joint_index: 0 for palm, 5 for thumb, 10 for index finger, 15 for middle finger, 20 for ring finger, 25 for pinky
-            #       - ori_x, ori_y, ori_z, ori_w: orientation of the joint in quaternion form
-            #       - pos_x, pos_y, pos_z: relative position of the joint to the palm, absolute position for the palm
-            #
-            #   - grasp_left: grasp value for the left hand (float)
-            #   - grasp_right: grasp value for the right hand (float)
             #
             # ---------------------------------------------------------------------------------------------
 
-            output_data = []
-            output_data.append(sim_time)
-            output_data.append(joint_data)
-            output_data.append(grasp_left)
-            output_data.append(grasp_right)
-            
+            # output_data = []
+            # output_data.append(sim_time)
+            # output_data.append(joint_data)
+            # output_data.append(grasp_left)
+            # output_data.append(grasp_right)
+
+            for index in joint_data.index:
+                hand = joint_data.loc[index]['hand']
+                joint_index = joint_data.loc[index]['joint_index']
+                output_data.loc[frame_idx, f'pos_x_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['pos_x']
+                output_data.loc[frame_idx, f'pos_y_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['pos_y']
+                output_data.loc[frame_idx, f'pos_z_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['pos_z']
+                output_data.loc[frame_idx, f'quat_x_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['quat_x']
+                output_data.loc[frame_idx, f'quat_y_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['quat_y']
+                output_data.loc[frame_idx, f'quat_z_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['quat_z']
+                output_data.loc[frame_idx, f'quat_w_hand_{int(hand)}_joint_{int(joint_index)}'] = joint_data.loc[index]['quat_w']
+            output_data.loc[frame_idx,'grasp_left'] = grasp_left
+            output_data.loc[frame_idx,'grasp_right'] = grasp_right
+            output_data.loc[frame_idx,'timestamp'] = sim_time
+
             print(output_data)
+                
 
     finally:
         sock.close()

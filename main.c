@@ -148,9 +148,12 @@ typedef struct {
 GLubyte* buffer_out = NULL;
 size_t buffer_out_size = 0;
 
-
+// flag for printing
 int flag = 0;
 clock_t start_time, current_time;
+
+int initialized_hand[HAND_COUNT] = {0};
+JointData initial_data[HAND_COUNT];
 
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1517,8 +1520,24 @@ get_hand_tracking(XrInstance instance,
 
 			// Check if the bit corresponding to the joint location is set
 			if (jointLocation.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) {
+				// Set initial data
+				if (initialized_hand[hand] == 0) {
+					initialized_hand[hand] = 1;
+					initial_data[hand].hand = hand;
+					initial_data[hand].joint_index = jointIndex;
+					initial_data[hand].pose = jointLocation.pose;					
+				}
+
 				// Set to jointLocation.pose if the bit is set
 				joint.pose = jointLocation.pose;
+				joint.pose.position.x = jointLocation.pose.position.x - initial_data[hand].pose.position.x;
+				joint.pose.position.y = jointLocation.pose.position.y - initial_data[hand].pose.position.y;
+				joint.pose.position.z = jointLocation.pose.position.z - initial_data[hand].pose.position.z;
+				joint.pose.orientation.x = jointLocation.pose.orientation.x - initial_data[hand].pose.orientation.x;
+				joint.pose.orientation.y = jointLocation.pose.orientation.y - initial_data[hand].pose.orientation.y;
+				joint.pose.orientation.z = jointLocation.pose.orientation.z - initial_data[hand].pose.orientation.z;
+				joint.pose.orientation.w = jointLocation.pose.orientation.w - initial_data[hand].pose.orientation.w;
+
 			} else {
 				// Set to default value if the bit is not set
 				joint.pose.position.x = JOINT_DEFAULT;
